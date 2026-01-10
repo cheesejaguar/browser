@@ -1,0 +1,19 @@
+[package]
+name = "cache"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+url.workspace = true
+parking_lot.workspace = true
+indexmap.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+lru = "0.12"
+tempfile = "3.12"

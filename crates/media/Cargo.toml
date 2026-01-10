@@ -1,0 +1,31 @@
+[package]
+name = "browser_media"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Image decoding
+image = "0.25"
+png = "0.17"
+jpeg-decoder = "0.3"
+gif = "0.13"
+webp = "0.3"
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+futures = "0.3"
+
+# Error handling
+thiserror = "1.0"
+
+# Data structures
+parking_lot = "0.12"
+
+# Logging
+tracing = "0.1"
+
+# URL handling
+url = "2.5"
+
+[dev-dependencies]
+tempfile = "3.10"

@@ -1,0 +1,33 @@
+[package]
+name = "networking"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+cache = { path = "../cache" }
+browser_security = { path = "../security" }
+reqwest.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+url.workspace = true
+parking_lot.workspace = true
+indexmap.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+flate2.workspace = true
+brotli.workspace = true
+mime = "0.3"
+encoding_rs = "0.8"
+bytes = "1.7"

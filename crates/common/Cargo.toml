@@ -1,0 +1,17 @@
+[package]
+name = "common"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+once_cell.workspace = true
+bitflags.workspace = true
+smallvec.workspace = true
+url.workspace = true
+serde.workspace = true
+ordered-float.workspace = true
+derive_more.workspace = true

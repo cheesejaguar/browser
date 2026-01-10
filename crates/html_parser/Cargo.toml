@@ -1,0 +1,17 @@
+[package]
+name = "html_parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+dom = { path = "../dom" }
+html5ever.workspace = true
+markup5ever.workspace = true
+markup5ever_rcdom.workspace = true
+tendril.workspace = true
+string_cache.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+url.workspace = true

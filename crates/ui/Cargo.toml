@@ -1,0 +1,20 @@
+[package]
+name = "ui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+gpu = { path = "../gpu" }
+render = { path = "../render" }
+compositor = { path = "../compositor" }
+winit.workspace = true
+wgpu.workspace = true
+raw-window-handle.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+fontdue.workspace = true
+image.workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "js_engine"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+dom = { path = "../dom" }
+web_apis = { path = "../web_apis" }
+boa_engine.workspace = true
+boa_gc.workspace = true
+boa_parser.workspace = true
+parking_lot.workspace = true
+indexmap.workspace = true
+slotmap.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+futures.workspace = true

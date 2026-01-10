@@ -1,0 +1,44 @@
+[package]
+name = "browser"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "oxide-browser"
+path = "src/main.rs"
+
+[dependencies]
+common = { path = "../common" }
+dom = { path = "../dom" }
+html_parser = { path = "../html_parser" }
+css_parser = { path = "../css_parser" }
+style = { path = "../style" }
+layout = { path = "../layout" }
+render = { path = "../render" }
+gpu = { path = "../gpu" }
+compositor = { path = "../compositor" }
+networking = { path = "../networking" }
+js_engine = { path = "../js_engine" }
+web_apis = { path = "../web_apis" }
+browser_media = { path = "../media" }
+browser_security = { path = "../security" }
+cache = { path = "../cache" }
+ui = { path = "../ui" }
+winit.workspace = true
+wgpu.workspace = true
+tokio.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+clap = { version = "4.5", features = ["derive"] }
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "browser_benchmarks"
+harness = false
