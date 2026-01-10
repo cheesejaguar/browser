@@ -1,0 +1,24 @@
+[package]
+name = "render"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+dom = { path = "../dom" }
+style = { path = "../style" }
+layout = { path = "../layout" }
+css_parser = { path = "../css_parser" }
+gpu = { path = "../gpu" }
+smallvec.workspace = true
+slotmap.workspace = true
+indexmap.workspace = true
+parking_lot.workspace = true
+bitflags.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+ordered-float.workspace = true
+image.workspace = true
+fontdue.workspace = true
+rayon = "1.10"

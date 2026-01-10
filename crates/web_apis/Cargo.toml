@@ -1,0 +1,21 @@
+[package]
+name = "web_apis"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+dom = { path = "../dom" }
+css_parser = { path = "../css_parser" }
+parking_lot.workspace = true
+indexmap.workspace = true
+slotmap.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+futures.workspace = true
+url.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64 = "0.22"

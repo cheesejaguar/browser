@@ -1,0 +1,386 @@
+/* Default User Agent Stylesheet */
+
+/* Box sizing */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* Document */
+html {
+    display: block;
+    font-size: 16px;
+    font-family: sans-serif;
+    line-height: 1.15;
+    color: #000000;
+    background-color: #ffffff;
+}
+
+/* Sections */
+body {
+    display: block;
+    margin: 8px;
+}
+
+article, aside, footer, header, nav, section, main {
+    display: block;
+}
+
+h1 {
+    display: block;
+    font-size: 2em;
+    font-weight: bold;
+    margin: 0.67em 0;
+}
+
+h2 {
+    display: block;
+    font-size: 1.5em;
+    font-weight: bold;
+    margin: 0.83em 0;
+}
+
+h3 {
+    display: block;
+    font-size: 1.17em;
+    font-weight: bold;
+    margin: 1em 0;
+}
+
+h4 {
+    display: block;
+    font-weight: bold;
+    margin: 1.33em 0;
+}
+
+h5 {
+    display: block;
+    font-size: 0.83em;
+    font-weight: bold;
+    margin: 1.67em 0;
+}
+
+h6 {
+    display: block;
+    font-size: 0.67em;
+    font-weight: bold;
+    margin: 2.33em 0;
+}
+
+/* Grouping content */
+p {
+    display: block;
+    margin: 1em 0;
+}
+
+hr {
+    display: block;
+    height: 0;
+    border-style: solid;
+    border-width: 1px 0 0 0;
+    border-color: #cccccc;
+    margin: 0.5em 0;
+}
+
+pre {
+    display: block;
+    font-family: monospace;
+    white-space: pre;
+    margin: 1em 0;
+}
+
+blockquote {
+    display: block;
+    margin: 1em 40px;
+}
+
+ol, ul {
+    display: block;
+    margin: 1em 0;
+    padding-left: 40px;
+}
+
+ol {
+    list-style-type: decimal;
+}
+
+ul {
+    list-style-type: disc;
+}
+
+li {
+    display: list-item;
+}
+
+dl {
+    display: block;
+    margin: 1em 0;
+}
+
+dt {
+    display: block;
+    font-weight: bold;
+}
+
+dd {
+    display: block;
+    margin-left: 40px;
+}
+
+figure {
+    display: block;
+    margin: 1em 40px;
+}
+
+figcaption {
+    display: block;
+}
+
+/* Text-level semantics */
+a {
+    color: #0000ee;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+a:visited {
+    color: #551a8b;
+}
+
+a:hover {
+    color: #0000ff;
+}
+
+a:active {
+    color: #ff0000;
+}
+
+em, i {
+    font-style: italic;
+}
+
+strong, b {
+    font-weight: bold;
+}
+
+small {
+    font-size: 0.83em;
+}
+
+s, strike, del {
+    text-decoration: line-through;
+}
+
+u, ins {
+    text-decoration: underline;
+}
+
+code, kbd, samp, tt {
+    font-family: monospace;
+}
+
+sub {
+    font-size: 0.83em;
+    vertical-align: sub;
+}
+
+sup {
+    font-size: 0.83em;
+    vertical-align: super;
+}
+
+mark {
+    background-color: yellow;
+    color: black;
+}
+
+abbr[title] {
+    text-decoration: underline dotted;
+}
+
+/* Embedded content */
+img {
+    display: inline-block;
+    border: none;
+}
+
+iframe {
+    display: inline-block;
+    border: 2px inset;
+}
+
+video, audio {
+    display: inline-block;
+}
+
+canvas {
+    display: inline-block;
+}
+
+svg {
+    display: inline-block;
+}
+
+/* Tabular data */
+table {
+    display: table;
+    border-collapse: separate;
+    border-spacing: 2px;
+}
+
+caption {
+    display: table-caption;
+    text-align: center;
+}
+
+thead {
+    display: table-header-group;
+}
+
+tbody {
+    display: table-row-group;
+}
+
+tfoot {
+    display: table-footer-group;
+}
+
+tr {
+    display: table-row;
+}
+
+th {
+    display: table-cell;
+    font-weight: bold;
+    text-align: center;
+    padding: 1px;
+}
+
+td {
+    display: table-cell;
+    padding: 1px;
+}
+
+colgroup {
+    display: table-column-group;
+}
+
+col {
+    display: table-column;
+}
+
+/* Forms */
+form {
+    display: block;
+}
+
+fieldset {
+    display: block;
+    border: 2px groove #c0c0c0;
+    padding: 0.35em 0.75em 0.625em;
+    margin: 0 2px;
+}
+
+legend {
+    display: block;
+    padding: 0 2px;
+}
+
+label {
+    cursor: default;
+}
+
+input {
+    display: inline-block;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 1px 2px;
+}
+
+input[type="hidden"] {
+    display: none;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    width: 13px;
+    height: 13px;
+    padding: 0;
+    margin: 3px 3px 3px 4px;
+}
+
+button {
+    display: inline-block;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 1px 6px;
+    cursor: pointer;
+}
+
+select {
+    display: inline-block;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+textarea {
+    display: inline-block;
+    font-family: monospace;
+    font-size: inherit;
+    white-space: pre-wrap;
+    padding: 2px;
+}
+
+/* Interactive elements */
+details {
+    display: block;
+}
+
+summary {
+    display: list-item;
+    cursor: pointer;
+}
+
+dialog {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    width: fit-content;
+    height: fit-content;
+    margin: auto;
+    border: solid;
+    padding: 1em;
+    background: white;
+}
+
+/* Hidden elements */
+[hidden], template, script, style, head, title, meta, link, base {
+    display: none;
+}
+
+/* Misc */
+address {
+    display: block;
+    font-style: italic;
+}
+
+center {
+    display: block;
+    text-align: center;
+}
+
+div {
+    display: block;
+}
+
+span {
+    display: inline;
+}
+
+br {
+    display: inline;
+}
+
+wbr {
+    display: inline;
+}

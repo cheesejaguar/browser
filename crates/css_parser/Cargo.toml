@@ -1,0 +1,19 @@
+[package]
+name = "css_parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+cssparser.workspace = true
+selectors.workspace = true
+smallvec.workspace = true
+string_cache.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+bitflags.workspace = true
+ordered-float.workspace = true
+indexmap.workspace = true
+derive_more.workspace = true
+url.workspace = true

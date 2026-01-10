@@ -1,0 +1,21 @@
+[package]
+name = "dom"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+indexmap.workspace = true
+slotmap.workspace = true
+smallvec.workspace = true
+string_cache.workspace = true
+tendril.workspace = true
+url.workspace = true
+serde.workspace = true
+bitflags.workspace = true
+derive_more.workspace = true
+once_cell.workspace = true
