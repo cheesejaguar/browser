@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <?define ProductName = "Oxide Browser" ?>
+    <?define ProductManufacturer = "Oxide Browser Team" ?>
+    <?define ProductVersion = "$(var.ProductVersion)" ?>
+    <?define ProductUpgradeCode = "E8B3F5A1-9C2D-4E6F-8A1B-3C5D7E9F0A2B" ?>
+
+    <Product Id="*"
+             Name="$(var.ProductName)"
+             Language="1033"
+             Version="$(var.ProductVersion)"
+             Manufacturer="$(var.ProductManufacturer)"
+             UpgradeCode="$(var.ProductUpgradeCode)">
+
+        <Package InstallerVersion="500"
+                 Compressed="yes"
+                 InstallScope="perMachine"
+                 Description="$(var.ProductName) Installer"
+                 Comments="A high-performance web browser written in Rust"
+                 Platform="x64" />
+
+        <!-- Upgrade handling -->
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+                      AllowSameVersionUpgrades="yes" />
+
+        <!-- Embed CAB in MSI -->
+        <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+        <!-- Custom icons -->
+        <Icon Id="OxideIcon" SourceFile="$(var.SourceDir)\oxide-browser.exe" />
+        <Property Id="ARPPRODUCTICON" Value="OxideIcon" />
+        <Property Id="ARPHELPLINK" Value="https://github.com/oxide-browser/oxide" />
+        <Property Id="ARPURLINFOABOUT" Value="https://github.com/oxide-browser/oxide" />
+
+        <!-- Installation directory -->
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="INSTALLFOLDER" Name="Oxide Browser">
+                    <Component Id="MainExecutable" Guid="A1B2C3D4-E5F6-7890-ABCD-EF1234567890" Win64="yes">
+                        <File Id="OxideBrowserExe"
+                              Name="oxide-browser.exe"
+                              Source="$(var.SourceDir)\oxide-browser.exe"
+                              KeyPath="yes">
+                            <!-- File associations -->
+                            <Shortcut Id="DesktopShortcut"
+                                      Directory="DesktopFolder"
+                                      Name="$(var.ProductName)"
+                                      WorkingDirectory="INSTALLFOLDER"
+                                      Icon="OxideIcon"
+                                      IconIndex="0"
+                                      Advertise="yes" />
+                        </File>
+
+                        <!-- Registry entries for default browser -->
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Clients\StartMenuInternet\OxideBrowser">
+                            <RegistryValue Type="string" Value="$(var.ProductName)" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Clients\StartMenuInternet\OxideBrowser\Capabilities">
+                            <RegistryValue Name="ApplicationName" Type="string" Value="$(var.ProductName)" />
+                            <RegistryValue Name="ApplicationDescription" Type="string" Value="A high-performance web browser" />
+                            <RegistryValue Name="ApplicationIcon" Type="string" Value="[INSTALLFOLDER]oxide-browser.exe,0" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Clients\StartMenuInternet\OxideBrowser\Capabilities\URLAssociations">
+                            <RegistryValue Name="http" Type="string" Value="OxideBrowserHTML" />
+                            <RegistryValue Name="https" Type="string" Value="OxideBrowserHTML" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Clients\StartMenuInternet\OxideBrowser\Capabilities\FileAssociations">
+                            <RegistryValue Name=".htm" Type="string" Value="OxideBrowserHTML" />
+                            <RegistryValue Name=".html" Type="string" Value="OxideBrowserHTML" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Clients\StartMenuInternet\OxideBrowser\DefaultIcon">
+                            <RegistryValue Type="string" Value="[INSTALLFOLDER]oxide-browser.exe,0" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Clients\StartMenuInternet\OxideBrowser\shell\open\command">
+                            <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]oxide-browser.exe&quot;" />
+                        </RegistryKey>
+
+                        <!-- Register capabilities -->
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\RegisteredApplications">
+                            <RegistryValue Name="OxideBrowser" Type="string" Value="SOFTWARE\Clients\StartMenuInternet\OxideBrowser\Capabilities" />
+                        </RegistryKey>
+
+                        <!-- HTML file type -->
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\OxideBrowserHTML">
+                            <RegistryValue Type="string" Value="Oxide Browser HTML Document" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\OxideBrowserHTML\DefaultIcon">
+                            <RegistryValue Type="string" Value="[INSTALLFOLDER]oxide-browser.exe,0" />
+                        </RegistryKey>
+                        <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\OxideBrowserHTML\shell\open\command">
+                            <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]oxide-browser.exe&quot; &quot;%1&quot;" />
+                        </RegistryKey>
+                    </Component>
+                </Directory>
+            </Directory>
+
+            <!-- Start Menu -->
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="$(var.ProductName)">
+                    <Component Id="StartMenuShortcuts" Guid="B2C3D4E5-F6A7-8901-BCDE-F23456789012" Win64="yes">
+                        <Shortcut Id="StartMenuShortcut"
+                                  Name="$(var.ProductName)"
+                                  Target="[INSTALLFOLDER]oxide-browser.exe"
+                                  WorkingDirectory="INSTALLFOLDER"
+                                  Icon="OxideIcon"
+                                  IconIndex="0" />
+                        <Shortcut Id="UninstallShortcut"
+                                  Name="Uninstall $(var.ProductName)"
+                                  Target="[SystemFolder]msiexec.exe"
+                                  Arguments="/x [ProductCode]" />
+                        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+                        <RegistryValue Root="HKCU"
+                                       Key="Software\OxideBrowser"
+                                       Name="StartMenuShortcut"
+                                       Type="integer"
+                                       Value="1"
+                                       KeyPath="yes" />
+                    </Component>
+                </Directory>
+            </Directory>
+
+            <!-- Desktop -->
+            <Directory Id="DesktopFolder" Name="Desktop" />
+        </Directory>
+
+        <!-- Features -->
+        <Feature Id="MainFeature" Title="$(var.ProductName)" Level="1" ConfigurableDirectory="INSTALLFOLDER">
+            <ComponentRef Id="MainExecutable" />
+            <ComponentRef Id="StartMenuShortcuts" />
+        </Feature>
+
+        <!-- UI -->
+        <UIRef Id="WixUI_InstallDir" />
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+        <!-- License -->
+        <WixVariable Id="WixUILicenseRtf" Value="$(var.SourceDir)\..\packaging\windows\License.rtf" />
+
+    </Product>
+</Wix>

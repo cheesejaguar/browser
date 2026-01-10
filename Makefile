@@ -116,18 +116,25 @@ macos-clean:
 linux:
 	cargo build --release -p browser
 
-## linux-deb: Build Debian package (requires cargo-deb)
+## linux-deb: Build Debian package
 linux-deb:
-	cargo deb -p browser
-
-## linux-rpm: Build RPM package (requires cargo-rpm)
-linux-rpm:
-	cargo rpm build
+	./packaging/linux/build-linux.sh --deb
 
 ## linux-appimage: Build AppImage
 linux-appimage:
-	@echo "AppImage packaging not yet implemented"
-	@exit 1
+	./packaging/linux/build-linux.sh --appimage
+
+## linux-tar: Build Linux tarball
+linux-tar:
+	./packaging/linux/build-linux.sh --tar
+
+## linux-all: Build all Linux packages
+linux-all:
+	./packaging/linux/build-linux.sh --all
+
+## linux-clean: Clean Linux build artifacts
+linux-clean:
+	rm -rf dist/linux
 
 #==============================================================================
 # Windows Targets
@@ -136,14 +143,38 @@ linux-appimage:
 ## windows: Build Windows binary (cross-compile or native)
 windows:
 ifeq ($(UNAME_S),Windows_NT)
-	cargo build --release -p browser
+	powershell -ExecutionPolicy Bypass -File packaging/windows/build-windows.ps1 -Portable
 else
 	cargo build --release -p browser --target x86_64-pc-windows-gnu
 endif
 
-## windows-msi: Build Windows MSI installer (requires cargo-wix)
-windows-msi:
-	cargo wix -p browser
+## windows-portable: Build Windows portable package
+windows-portable:
+ifeq ($(UNAME_S),Windows_NT)
+	powershell -ExecutionPolicy Bypass -File packaging/windows/build-windows.ps1 -Portable
+else
+	@echo "Windows packaging requires Windows. Use GitHub Actions for cross-platform builds."
+endif
+
+## windows-installer: Build Windows MSI installer
+windows-installer:
+ifeq ($(UNAME_S),Windows_NT)
+	powershell -ExecutionPolicy Bypass -File packaging/windows/build-windows.ps1 -Installer
+else
+	@echo "Windows packaging requires Windows. Use GitHub Actions for cross-platform builds."
+endif
+
+## windows-all: Build all Windows packages
+windows-all:
+ifeq ($(UNAME_S),Windows_NT)
+	powershell -ExecutionPolicy Bypass -File packaging/windows/build-windows.ps1 -All
+else
+	@echo "Windows packaging requires Windows. Use GitHub Actions for cross-platform builds."
+endif
+
+## windows-clean: Clean Windows build artifacts
+windows-clean:
+	rm -rf dist/windows
 
 #==============================================================================
 # Development Targets
