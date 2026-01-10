@@ -1,0 +1,66 @@
+# Cargo configuration for Oxide Browser
+
+# macOS-specific settings
+[target.x86_64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,@executable_path/../Frameworks",
+    "-C", "target-cpu=x86-64-v2",
+]
+
+[target.aarch64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,@executable_path/../Frameworks",
+    "-C", "target-cpu=apple-m1",
+]
+
+# Linux settings
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib",
+]
+
+# Windows settings
+[target.x86_64-pc-windows-msvc]
+rustflags = []
+
+# Build settings
+[build]
+# Use all available CPU cores
+jobs = -1
+
+# Incremental compilation for faster rebuilds
+incremental = true
+
+# Profile settings
+[profile.release]
+lto = "thin"
+codegen-units = 4
+opt-level = 3
+strip = "symbols"
+panic = "abort"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = "none"
+
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+[profile.bench]
+inherits = "release"
+debug = false
+lto = true
+codegen-units = 1
+
+# Aliases for common commands
+[alias]
+b = "build"
+r = "run"
+t = "test"
+c = "check"
+br = "build --release"
+rr = "run --release"
+package-macos = "run --release -p browser"
