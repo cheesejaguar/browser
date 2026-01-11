@@ -1,11 +1,11 @@
 //! CSS Grid layout implementation.
 
 use crate::box_model::ContainingBlock;
-use crate::layout_box::{GridLayoutData, LayoutBox, LayoutBoxId};
+use crate::layout_box::{GridLayoutData, GridPlacement, LayoutBox, LayoutBoxId, LayoutData};
 use crate::tree::LayoutTree;
 use style::computed::{
-    AlignContent, AlignItems, ComputedStyle, GridAutoFlow, GridTemplateTrack, JustifyContent,
-    JustifyItems, LengthPercentageAuto,
+    AlignContent, AlignItems, ComputedStyle, GridAutoFlow, JustifyContent,
+    JustifyItems, SizeValue,
 };
 
 /// Grid formatting context.
@@ -185,8 +185,8 @@ impl GridFormattingContext {
         let rows = Self::parse_track_list(&style.grid_template_rows, height.unwrap_or(0.0));
 
         // Get gaps
-        let column_gap = Self::resolve_gap(&style.column_gap, width);
-        let row_gap = Self::resolve_gap(&style.row_gap, height.unwrap_or(width));
+        let column_gap = style.column_gap;
+        let row_gap = style.row_gap;
 
         Self {
             columns,
@@ -203,26 +203,47 @@ impl GridFormattingContext {
         }
     }
 
-    /// Parse track list from style.
-    fn parse_track_list(template: &GridTemplateTrack, available: f32) -> Vec<GridTrack> {
-        match template {
-            GridTemplateTrack::None => Vec::new(),
-            GridTemplateTrack::TrackList(tracks) => {
-                tracks
-                    .iter()
-                    .map(|t| {
-                        let sizing = Self::parse_track_sizing(t, available);
-                        GridTrack {
-                            sizing,
-                            base_size: 0.0,
-                            growth_limit: f32::INFINITY,
-                            final_size: 0.0,
-                            start: 0.0,
-                        }
-                    })
-                    .collect()
+    /// Parse track list from style GridTrack values.
+    fn parse_track_list(template: &[style::computed::GridTrack], _available: f32) -> Vec<GridTrack> {
+        if template.is_empty() {
+            return Vec::new();
+        }
+
+        template
+            .iter()
+            .map(|t| {
+                let sizing = Self::convert_grid_track(t);
+                GridTrack {
+                    sizing,
+                    base_size: 0.0,
+                    growth_limit: f32::INFINITY,
+                    final_size: 0.0,
+                    start: 0.0,
+                }
+            })
+            .collect()
+    }
+
+    /// Convert style::computed::GridTrack to internal TrackSizing.
+    fn convert_grid_track(track: &style::computed::GridTrack) -> TrackSizing {
+        match track {
+            style::computed::GridTrack::Length(l) => TrackSizing::Fixed(*l),
+            style::computed::GridTrack::Percentage(p) => TrackSizing::Percentage(*p),
+            style::computed::GridTrack::Fr(f) => TrackSizing::Flex(*f),
+            style::computed::GridTrack::Auto => TrackSizing::Auto,
+            style::computed::GridTrack::MinContent => TrackSizing::MinContent,
+            style::computed::GridTrack::MaxContent => TrackSizing::MaxContent,
+            style::computed::GridTrack::MinMax(min, max) => {
+                TrackSizing::MinMax(
+                    Box::new(Self::convert_grid_track(min)),
+                    Box::new(Self::convert_grid_track(max)),
+                )
             }
-            GridTemplateTrack::Subgrid => Vec::new(), // Not fully supported
+            style::computed::GridTrack::Repeat(count, tracks) => {
+                // Expand repeat into individual tracks
+                // For simplicity, just treat as auto for now
+                TrackSizing::Auto
+            }
         }
     }
 
@@ -281,11 +302,11 @@ impl GridFormattingContext {
     }
 
     /// Resolve gap value.
-    fn resolve_gap(gap: &LengthPercentageAuto, available: f32) -> f32 {
+    fn resolve_gap(gap: &SizeValue, available: f32) -> f32 {
         match gap {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => available * p / 100.0,
-            LengthPercentageAuto::Auto => 0.0,
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => available * p / 100.0,
+            _ => 0.0,
         }
     }
 
@@ -496,7 +517,9 @@ impl GridFormattingContext {
     /// Size the tracks.
     fn size_tracks(&mut self, items: &[GridItem], tree: &LayoutTree) {
         // Calculate column sizes
-        self.size_track_list(&mut self.columns, self.container_width, self.column_gap, items, true, tree);
+        let container_width = self.container_width;
+        let column_gap = self.column_gap;
+        Self::size_track_list_static(&mut self.columns, container_width, column_gap, items, true, tree);
 
         // Calculate row sizes
         let row_available = self.container_height.unwrap_or_else(|| {
@@ -508,12 +531,12 @@ impl GridFormattingContext {
                 .fold(0.0f32, |a, b| a.max(b))
         });
 
-        self.size_track_list(&mut self.rows, row_available, self.row_gap, items, false, tree);
+        let row_gap = self.row_gap;
+        Self::size_track_list_static(&mut self.rows, row_available, row_gap, items, false, tree);
     }
 
-    /// Size a list of tracks.
-    fn size_track_list(
-        &self,
+    /// Size a list of tracks (static version to avoid borrow issues).
+    fn size_track_list_static(
         tracks: &mut Vec<GridTrack>,
         available: f32,
         gap: f32,
@@ -525,8 +548,12 @@ impl GridFormattingContext {
             return;
         }
 
-        let total_gap = gap * (tracks.len() - 1).max(0) as f32;
+        let track_count = tracks.len();
+        let total_gap = gap * (track_count - 1).max(0) as f32;
         let available_for_tracks = (available - total_gap).max(0.0);
+
+        // Pre-calculate content size for auto tracks
+        let content_size = Self::calculate_content_size_static(track_count, is_columns, items, tree);
 
         // First pass: resolve fixed and percentage tracks
         let mut remaining = available_for_tracks;
@@ -549,18 +576,14 @@ impl GridFormattingContext {
                     flex_total += fr;
                 }
                 TrackSizing::Auto | TrackSizing::MinContent | TrackSizing::MaxContent => {
-                    // Calculate from content
-                    let content_size = self.calculate_content_size(tracks.len(), is_columns, items, tree);
                     track.base_size = content_size;
                 }
                 TrackSizing::FitContent(max) => {
-                    let content_size = self.calculate_content_size(tracks.len(), is_columns, items, tree);
                     track.base_size = content_size.min(*max);
                 }
                 TrackSizing::MinMax(min, max) => {
-                    // For now, use a simplified approach
-                    track.base_size = self.resolve_track_value(min, available);
-                    track.growth_limit = self.resolve_track_value(max, available);
+                    track.base_size = Self::resolve_track_value_static(min, available);
+                    track.growth_limit = Self::resolve_track_value_static(max, available);
                 }
             }
         }
@@ -591,9 +614,8 @@ impl GridFormattingContext {
         }
     }
 
-    /// Calculate content size for auto tracks.
-    fn calculate_content_size(
-        &self,
+    /// Calculate content size for auto tracks (static version).
+    fn calculate_content_size_static(
         track_count: usize,
         is_columns: bool,
         items: &[GridItem],
@@ -619,8 +641,8 @@ impl GridFormattingContext {
         sizes.iter().sum::<f32>() / track_count as f32
     }
 
-    /// Resolve a track sizing value to pixels.
-    fn resolve_track_value(&self, sizing: &TrackSizing, available: f32) -> f32 {
+    /// Resolve a track sizing value to pixels (static version).
+    fn resolve_track_value_static(sizing: &TrackSizing, available: f32) -> f32 {
         match sizing {
             TrackSizing::Fixed(px) => *px,
             TrackSizing::Percentage(pct) => available * pct / 100.0,
@@ -629,29 +651,33 @@ impl GridFormattingContext {
             TrackSizing::MinContent => 0.0,
             TrackSizing::MaxContent => f32::INFINITY,
             TrackSizing::FitContent(max) => *max,
-            TrackSizing::MinMax(min, _) => self.resolve_track_value(min, available),
+            TrackSizing::MinMax(min, _) => Self::resolve_track_value_static(min, available),
         }
     }
 
     /// Position tracks (calculate start positions).
     fn position_tracks(&mut self) {
         // Position columns
+        let column_count = self.columns.len();
+        let column_gap = self.column_gap;
         let mut x = 0.0;
         for (i, track) in self.columns.iter_mut().enumerate() {
             track.start = x;
             x += track.final_size;
-            if i < self.columns.len() - 1 {
-                x += self.column_gap;
+            if i < column_count - 1 {
+                x += column_gap;
             }
         }
 
         // Position rows
+        let row_count = self.rows.len();
+        let row_gap = self.row_gap;
         let mut y = 0.0;
         for (i, track) in self.rows.iter_mut().enumerate() {
             track.start = y;
             y += track.final_size;
-            if i < self.rows.len() - 1 {
-                y += self.row_gap;
+            if i < row_count - 1 {
+                y += row_gap;
             }
         }
     }
@@ -688,11 +714,13 @@ impl GridFormattingContext {
                 layout_box.dimensions.content.height = height;
 
                 // Store grid data
-                layout_box.grid_data = Some(GridLayoutData {
-                    column_start: col_start,
-                    column_end: col_end,
-                    row_start: row_start,
-                    row_end: row_end,
+                layout_box.data = LayoutData::Grid(GridLayoutData {
+                    row: GridPlacement::default(),
+                    column: GridPlacement::default(),
+                    row_start: row_start as i32,
+                    row_end: row_end as i32,
+                    column_start: col_start as i32,
+                    column_end: col_end as i32,
                 });
             }
         }

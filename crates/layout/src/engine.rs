@@ -2,8 +2,6 @@
 
 use crate::block::BlockFormattingContext;
 use crate::box_model::{BoxDimensions, BoxType, ContainingBlock};
-use crate::flex::FlexFormattingContext;
-use crate::grid::GridFormattingContext;
 use crate::inline::InlineFormattingContext;
 use crate::layout_box::{LayoutBox, LayoutBoxId};
 use crate::text::TextShaper;
@@ -432,7 +430,7 @@ impl LayoutEngine {
         self.calculate_block_position(tree, box_id, containing_block);
 
         // Perform flex layout on children
-        FlexFormattingContext::layout(tree, box_id, &self.text_shaper);
+        crate::flex::layout_flex_container(tree, box_id, containing_block);
 
         // Calculate height after flex layout
         self.calculate_block_height(tree, box_id);
@@ -450,7 +448,7 @@ impl LayoutEngine {
         self.calculate_block_position(tree, box_id, containing_block);
 
         // Perform grid layout on children
-        GridFormattingContext::layout(tree, box_id);
+        crate::grid::layout_grid_container(tree, box_id, containing_block);
 
         // Calculate height after grid layout
         self.calculate_block_height(tree, box_id);

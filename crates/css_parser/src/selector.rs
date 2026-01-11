@@ -144,7 +144,7 @@ impl Selector {
         // Check ID
         if let Some(ref id) = self.id {
             match &element.id {
-                Some(elem_id) if elem_id == id => {}
+                Some(elem_id) if elem_id.as_ref() == id.as_str() => {}
                 _ => return false,
             }
         }

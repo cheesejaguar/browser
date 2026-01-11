@@ -4,9 +4,10 @@ use crate::box_model::{BoxDimensions, ContainingBlock};
 use crate::layout_box::{FlexLayoutData, LayoutBox, LayoutBoxId};
 use crate::tree::LayoutTree;
 use common::geometry::EdgeSizes;
+use crate::layout_box::LayoutData;
 use style::computed::{
     AlignContent, AlignItems, AlignSelf, ComputedStyle, FlexDirection, FlexWrap,
-    JustifyContent, LengthPercentage, LengthPercentageAuto,
+    JustifyContent, SizeValue,
 };
 
 /// Flexbox formatting context.
@@ -199,12 +200,19 @@ impl FlexFormattingContext {
     }
 
     /// Calculate base size from flex-basis.
-    fn calculate_base_size(&self, layout_box: &LayoutBox, flex_basis: &LengthPercentageAuto) -> f32 {
+    fn calculate_base_size(&self, layout_box: &LayoutBox, flex_basis: &SizeValue) -> f32 {
         match flex_basis {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => self.main_size * p / 100.0,
-            LengthPercentageAuto::Auto => {
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => self.main_size * p / 100.0,
+            SizeValue::Auto => {
                 // Use content size
+                if self.is_row {
+                    layout_box.dimensions.content.width
+                } else {
+                    layout_box.dimensions.content.height
+                }
+            }
+            _ => {
                 if self.is_row {
                     layout_box.dimensions.content.width
                 } else {
@@ -216,11 +224,12 @@ impl FlexFormattingContext {
 
     /// Get margins in main/cross axis terms.
     fn get_margins(&self, style: &ComputedStyle) -> (f32, f32, f32, f32) {
-        let resolve = |v: &LengthPercentageAuto| -> f32 {
+        let resolve = |v: &SizeValue| -> f32 {
             match v {
-                LengthPercentageAuto::Length(l) => *l,
-                LengthPercentageAuto::Percentage(p) => self.main_size * p / 100.0,
-                LengthPercentageAuto::Auto => 0.0,
+                SizeValue::Length(l) => *l,
+                SizeValue::Percentage(p) => self.main_size * p / 100.0,
+                SizeValue::Auto => 0.0,
+                _ => 0.0,
             }
         };
 
@@ -269,27 +278,31 @@ impl FlexFormattingContext {
         }
     }
 
-    /// Resolve a LengthPercentageAuto to pixels.
-    fn resolve_length(&self, value: &LengthPercentageAuto) -> f32 {
+    /// Resolve a SizeValue to pixels.
+    fn resolve_length(&self, value: &SizeValue) -> f32 {
         match value {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => self.main_size * p / 100.0,
-            LengthPercentageAuto::Auto => 0.0,
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => self.main_size * p / 100.0,
+            SizeValue::Auto => 0.0,
+            SizeValue::None => 0.0,
+            _ => 0.0,
         }
     }
 
     /// Resolve max-width/height.
-    fn resolve_max_length(&self, value: &LengthPercentageAuto) -> f32 {
+    fn resolve_max_length(&self, value: &SizeValue) -> f32 {
         match value {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => self.main_size * p / 100.0,
-            LengthPercentageAuto::Auto => f32::INFINITY,
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => self.main_size * p / 100.0,
+            SizeValue::Auto => f32::INFINITY,
+            SizeValue::None => f32::INFINITY,
+            _ => f32::INFINITY,
         }
     }
 
     /// Collect items into flex lines.
     fn collect_into_lines(&self, items: Vec<FlexItem>) -> Vec<FlexLine> {
-        if matches!(self.wrap, FlexWrap::Nowrap) {
+        if matches!(self.wrap, FlexWrap::NoWrap) {
             // Single line
             let main_size: f32 = items
                 .iter()
@@ -413,6 +426,14 @@ impl FlexFormattingContext {
             // Distribute space
             let mut any_frozen = false;
 
+            // Pre-calculate total_scaled for shrinking before the mutable iteration
+            let total_scaled: f32 = line
+                .items
+                .iter()
+                .filter(|i| !i.frozen)
+                .map(|i| i.flex_shrink * i.base_size)
+                .sum();
+
             for item in &mut line.items {
                 if item.frozen {
                     continue;
@@ -432,12 +453,6 @@ impl FlexFormattingContext {
                 } else {
                     // For shrinking, scale by flex-basis
                     let scaled_shrink = item.flex_shrink * item.base_size;
-                    let total_scaled: f32 = line
-                        .items
-                        .iter()
-                        .filter(|i| !i.frozen)
-                        .map(|i| i.flex_shrink * i.base_size)
-                        .sum();
 
                     if total_scaled > 0.0 {
                         let shrink_ratio = scaled_shrink / total_scaled;
@@ -489,8 +504,8 @@ impl FlexFormattingContext {
                 };
 
                 item.cross_size = match specified_cross {
-                    LengthPercentageAuto::Length(l) => *l,
-                    LengthPercentageAuto::Percentage(p) => {
+                    SizeValue::Length(l) => *l,
+                    SizeValue::Percentage(p) => {
                         if let Some(cs) = self.cross_size {
                             cs * p / 100.0
                         } else {
@@ -502,8 +517,15 @@ impl FlexFormattingContext {
                             }
                         }
                     }
-                    LengthPercentageAuto::Auto => {
+                    SizeValue::Auto => {
                         // Use intrinsic size or stretch
+                        if self.is_row {
+                            layout_box.dimensions.content.height.max(layout_box.style.font_size * 1.2)
+                        } else {
+                            layout_box.dimensions.content.width.max(item.target_main_size)
+                        }
+                    }
+                    _ => {
                         if self.is_row {
                             layout_box.dimensions.content.height.max(layout_box.style.font_size * 1.2)
                         } else {
@@ -682,11 +704,15 @@ impl FlexFormattingContext {
                     }
 
                     // Store flex data
-                    layout_box.flex_data = Some(FlexLayoutData {
+                    layout_box.data = LayoutData::Flex(FlexLayoutData {
                         main_size: item.target_main_size,
                         cross_size: item.cross_size,
-                        main_position: main_pos,
-                        cross_position: item_cross_pos,
+                        flex_basis: item.base_size,
+                        flex_grow: item.flex_grow,
+                        flex_shrink: item.flex_shrink,
+                        violated_min: false,
+                        violated_max: false,
+                        frozen: item.frozen,
                     });
                 }
 

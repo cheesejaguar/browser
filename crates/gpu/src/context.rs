@@ -1,7 +1,7 @@
 //! GPU context and device management.
 
 use parking_lot::RwLock;
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::sync::Arc;
 use thiserror::Error;
 use wgpu::{
@@ -89,7 +89,7 @@ impl GpuContext {
     /// Create context with a window surface.
     pub async fn with_window<W>(window: Arc<W>) -> Result<Self, GpuError>
     where
-        W: HasRawWindowHandle + HasRawDisplayHandle + Send + Sync + 'static,
+        W: HasWindowHandle + HasDisplayHandle + Send + Sync + 'static,
     {
         let instance = Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),

@@ -131,11 +131,9 @@ pub fn initial_value(property: &PropertyId) -> css_parser::values::CssValue {
 }
 
 /// Properties that force inheritance.
-pub fn forces_inheritance(property: &PropertyId) -> bool {
-    matches!(
-        property,
-        PropertyId::All
-    )
+/// Note: The CSS `all` property is a shorthand that's not yet implemented.
+pub fn forces_inheritance(_property: &PropertyId) -> bool {
+    false
 }
 
 /// Get list of all inherited properties.

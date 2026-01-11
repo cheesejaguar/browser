@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 common = { path = "../common" }
+dom = { path = "../dom" }
 cssparser.workspace = true
 selectors.workspace = true
 smallvec.workspace = true

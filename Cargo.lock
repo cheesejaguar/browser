@@ -1192,6 +1192,7 @@ dependencies = [
  "common",
  "cssparser",
  "derive_more 1.0.0",
+ "dom",
  "indexmap",
  "ordered-float",
  "selectors",
@@ -4493,6 +4494,7 @@ dependencies = [
  "smallvec",
  "thiserror 1.0.69",
  "tracing",
+ "url",
 ]
 
 [[package]]

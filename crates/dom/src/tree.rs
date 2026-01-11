@@ -173,7 +173,7 @@ impl DomTree {
         // Update parent's children list
         if let Some(parent_id) = parent {
             if let Some(parent_node) = self.nodes.get_mut(parent_id) {
-                parent_node.children.retain(|&id| id != node);
+                parent_node.children.retain(|id| *id != node);
             }
         }
 

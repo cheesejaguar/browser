@@ -102,7 +102,7 @@ impl LayoutTree {
         if let Some(parent_box) = self.boxes.get_mut(parent) {
             match reference {
                 Some(ref_id) => {
-                    if let Some(pos) = parent_box.children.iter().position(|&id| id == ref_id) {
+                    if let Some(pos) = parent_box.children.iter().position(|id| *id == ref_id) {
                         parent_box.children.insert(pos, child);
                     } else {
                         parent_box.children.push(child);
@@ -120,7 +120,7 @@ impl LayoutTree {
         // Remove from parent
         if let Some(parent_id) = self.boxes.get(box_id).and_then(|b| b.parent) {
             if let Some(parent) = self.boxes.get_mut(parent_id) {
-                parent.children.retain(|&id| id != box_id);
+                parent.children.retain(|id| *id != box_id);
             }
         }
 

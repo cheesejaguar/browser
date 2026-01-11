@@ -9,8 +9,9 @@ use crate::stylesheet::{
 };
 use crate::values::CssValue;
 use cssparser::{
-    BasicParseError, BasicParseErrorKind, CowRcStr, DeclarationListParser, DeclarationParser,
-    ParseError, Parser, ParserInput, RuleListParser, SourceLocation, ToCss, Token,
+    BasicParseError, BasicParseErrorKind, CowRcStr, DeclarationParser,
+    ParseError, Parser, ParserInput, ParserState, RuleBodyItemParser, RuleBodyParser,
+    StyleSheetParser, ToCss, Token,
 };
 use std::sync::Arc;
 use url::Url;
@@ -32,11 +33,11 @@ impl CssParser {
 
         let mut stylesheet = Stylesheet::new(self.base_url.clone());
 
-        let rule_parser = TopLevelRuleParser {
+        let mut rule_parser = TopLevelRuleParser {
             base_url: &self.base_url,
         };
 
-        for result in RuleListParser::new_for_stylesheet(&mut parser, rule_parser) {
+        for result in StyleSheetParser::new(&mut parser, &mut rule_parser) {
             match result {
                 Ok(rule) => stylesheet.rules.push(rule),
                 Err((err, _slice)) => {
@@ -53,14 +54,13 @@ impl CssParser {
         let mut input = ParserInput::new(css);
         let mut parser = Parser::new(&mut input);
 
-        let decl_parser = DeclarationListParser::new(
-            &mut parser,
-            PropertyDeclarationParser {
-                base_url: &self.base_url,
-            },
-        );
+        let mut decl_parser = StyleAttributeParser {
+            base_url: &self.base_url,
+        };
 
-        decl_parser
+        let body_parser = RuleBodyParser::new(&mut parser, &mut decl_parser);
+
+        body_parser
             .filter_map(|result| result.ok())
             .collect()
     }
@@ -96,7 +96,7 @@ impl<'i> cssparser::QualifiedRuleParser<'i> for TopLevelRuleParser<'_> {
     fn parse_block<'t>(
         &mut self,
         prelude: Self::Prelude,
-        _location: SourceLocation,
+        _start: &ParserState,
         input: &mut Parser<'i, 't>,
     ) -> Result<Self::QualifiedRule, ParseError<'i, Self::Error>> {
         let declarations = parse_declaration_block(input, self.base_url);
@@ -156,7 +156,7 @@ impl<'i> cssparser::AtRuleParser<'i> for TopLevelRuleParser<'_> {
     fn rule_without_block(
         &mut self,
         prelude: Self::Prelude,
-        _location: SourceLocation,
+        _start: &ParserState,
     ) -> Result<Self::AtRule, ()> {
         match prelude {
             AtRulePrelude::Import(url, media) => {
@@ -179,7 +179,7 @@ impl<'i> cssparser::AtRuleParser<'i> for TopLevelRuleParser<'_> {
     fn parse_block<'t>(
         &mut self,
         prelude: Self::Prelude,
-        _location: SourceLocation,
+        _start: &ParserState,
         input: &mut Parser<'i, 't>,
     ) -> Result<Self::AtRule, ParseError<'i, Self::Error>> {
         match prelude {
@@ -220,7 +220,59 @@ enum AtRulePrelude {
     Page(Option<String>),
 }
 
-/// Property declaration parser.
+/// Style attribute parser (for parsing inline styles).
+struct StyleAttributeParser<'a> {
+    base_url: &'a Url,
+}
+
+impl<'i> DeclarationParser<'i> for StyleAttributeParser<'_> {
+    type Declaration = PropertyDeclaration;
+    type Error = CssParseError<'i>;
+
+    fn parse_value<'t>(
+        &mut self,
+        name: CowRcStr<'i>,
+        input: &mut Parser<'i, 't>,
+    ) -> Result<Self::Declaration, ParseError<'i, Self::Error>> {
+        let property_id = PropertyId::from_name(&name);
+        let value = parse_property_value(input, &property_id, self.base_url)?;
+        let important = input
+            .try_parse(|i| {
+                i.expect_delim('!')?;
+                i.expect_ident_matching("important")
+            })
+            .is_ok();
+
+        Ok(PropertyDeclaration {
+            property: property_id,
+            value,
+            important,
+        })
+    }
+}
+
+impl<'i> cssparser::AtRuleParser<'i> for StyleAttributeParser<'_> {
+    type Prelude = ();
+    type AtRule = PropertyDeclaration;
+    type Error = CssParseError<'i>;
+}
+
+impl<'i> cssparser::QualifiedRuleParser<'i> for StyleAttributeParser<'_> {
+    type Prelude = ();
+    type QualifiedRule = PropertyDeclaration;
+    type Error = CssParseError<'i>;
+}
+
+impl<'i> RuleBodyItemParser<'i, PropertyDeclaration, CssParseError<'i>> for StyleAttributeParser<'_> {
+    fn parse_declarations(&self) -> bool {
+        true
+    }
+    fn parse_qualified(&self) -> bool {
+        false
+    }
+}
+
+/// Property declaration parser for declaration blocks.
 struct PropertyDeclarationParser<'a> {
     base_url: &'a Url,
 }
@@ -261,6 +313,21 @@ impl<'i> cssparser::AtRuleParser<'i> for PropertyDeclarationParser<'_> {
     type Error = CssParseError<'i>;
 }
 
+impl<'i> cssparser::QualifiedRuleParser<'i> for PropertyDeclarationParser<'_> {
+    type Prelude = ();
+    type QualifiedRule = PropertyDeclaration;
+    type Error = CssParseError<'i>;
+}
+
+impl<'i> RuleBodyItemParser<'i, PropertyDeclaration, CssParseError<'i>> for PropertyDeclarationParser<'_> {
+    fn parse_declarations(&self) -> bool {
+        true
+    }
+    fn parse_qualified(&self) -> bool {
+        false
+    }
+}
+
 /// Custom parse error.
 #[derive(Clone, Debug)]
 pub enum CssParseError<'i> {
@@ -287,10 +354,11 @@ fn parse_selector_list<'i, 't>(
         let selector = parse_selector(input)?;
         selectors.push(selector);
 
+        let state = input.state();
         match input.next() {
             Ok(&Token::Comma) => continue,
             Ok(_) => {
-                input.reset_to_before();
+                input.reset(&state);
                 break;
             }
             Err(_) => break,
@@ -309,13 +377,14 @@ fn parse_selector<'i, 't>(
 
     loop {
         // Try to parse a simple selector component
+        let state = input.state();
         match input.next_including_whitespace() {
             Ok(token) => match token {
                 Token::Ident(ident) => {
                     if selector.tag.is_none() && !has_content {
                         selector.tag = Some(ident.to_string().to_ascii_lowercase());
                     } else {
-                        input.reset_to_before();
+                        input.reset(&state);
                         break;
                     }
                     has_content = true;
@@ -386,11 +455,11 @@ fn parse_selector<'i, 't>(
                     break;
                 }
                 Token::Comma | Token::CurlyBracketBlock => {
-                    input.reset_to_before();
+                    input.reset(&state);
                     break;
                 }
                 _ => {
-                    input.reset_to_before();
+                    input.reset(&state);
                     break;
                 }
             },
@@ -425,7 +494,7 @@ fn parse_attribute_selector<'i, 't>(
         (None, None, crate::selector::CaseSensitivity::Default)
     } else {
         let op = input.expect_delim('=').ok().map(|_| "=".to_string()).or_else(|| {
-            input.try_parse(|i| {
+            input.try_parse(|i| -> Result<String, ParseError<'_, CssParseError<'_>>> {
                 let c = match i.next()? {
                     Token::Delim(c) => *c,
                     _ => return Err(i.new_custom_error(CssParseError::InvalidSelector)),
@@ -438,7 +507,7 @@ fn parse_attribute_selector<'i, 't>(
         if let Some(op) = op {
             let value = input.expect_ident_or_string()?.as_ref().to_string();
 
-            let case = input.try_parse(|i| {
+            let case = input.try_parse(|i| -> Result<crate::selector::CaseSensitivity, ParseError<'_, CssParseError<'_>>> {
                 let ident = i.expect_ident()?;
                 match ident.as_ref() {
                     "i" | "I" => Ok(crate::selector::CaseSensitivity::Insensitive),
@@ -463,10 +532,10 @@ fn parse_attribute_selector<'i, 't>(
 
 /// Parse declaration block.
 fn parse_declaration_block(input: &mut Parser<'_, '_>, base_url: &Url) -> Vec<PropertyDeclaration> {
-    let parser = PropertyDeclarationParser { base_url };
-    let decl_parser = DeclarationListParser::new(input, parser);
+    let mut parser = PropertyDeclarationParser { base_url };
+    let body_parser = RuleBodyParser::new(input, &mut parser);
     let mut declarations = Vec::new();
-    for result in decl_parser {
+    for result in body_parser {
         if let Ok(decl) = result {
             declarations.push(decl);
         }
@@ -476,8 +545,8 @@ fn parse_declaration_block(input: &mut Parser<'_, '_>, base_url: &Url) -> Vec<Pr
 
 /// Parse rule list (for nested rules).
 fn parse_rule_list(input: &mut Parser<'_, '_>, base_url: &Url) -> Vec<CssRule> {
-    let rule_parser = TopLevelRuleParser { base_url };
-    let list_parser = RuleListParser::new_for_stylesheet(input, rule_parser);
+    let mut rule_parser = TopLevelRuleParser { base_url };
+    let list_parser = StyleSheetParser::new(input, &mut rule_parser);
     let mut rules = Vec::new();
     for result in list_parser {
         if let Ok(rule) = result {
@@ -608,8 +677,8 @@ fn parse_keyframe_selectors<'i, 't>(
     let mut selectors = Vec::new();
 
     loop {
-        if let Ok(ident) = input.try_parse(|i| i.expect_ident()) {
-            selectors.push(ident.to_string());
+        if let Ok(ident) = input.try_parse(|i| i.expect_ident().map(|s| s.to_string())) {
+            selectors.push(ident);
         } else if let Ok(percentage) = input.try_parse(|i| i.expect_percentage()) {
             selectors.push(format!("{}%", percentage * 100.0));
         } else {

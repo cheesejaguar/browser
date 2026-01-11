@@ -94,7 +94,7 @@ impl InlineFormattingContext {
             None => return,
         };
 
-        let text_run = match &layout_box.text_run {
+        let text_run = match &layout_box.text {
             Some(tr) => tr.clone(),
             None => return,
         };
@@ -120,7 +120,7 @@ impl InlineFormattingContext {
         style: &ComputedStyle,
     ) {
         // Check white-space property
-        let can_wrap = !matches!(style.white_space, WhiteSpace::Nowrap | WhiteSpace::Pre);
+        let can_wrap = !matches!(style.white_space, WhiteSpace::NoWrap | WhiteSpace::Pre);
 
         if !can_wrap {
             // Can't wrap, just overflow
@@ -283,7 +283,7 @@ impl InlineFormattingContext {
 
         // Get intrinsic dimensions from replaced content
         let (width, height) = if let Some(ref replaced) = layout_box.replaced {
-            (replaced.width, replaced.height)
+            (replaced.intrinsic_width.unwrap_or(300.0), replaced.intrinsic_height.unwrap_or(150.0))
         } else {
             (300.0, 150.0) // Default replaced element size
         };
@@ -374,7 +374,7 @@ impl InlineFormattingContext {
                 fragment.x += offset;
 
                 // Apply vertical alignment
-                let vertical_offset = self.calculate_vertical_offset(
+                let vertical_offset = Self::calculate_vertical_offset_for(
                     tree,
                     fragment.layout_box,
                     line.baseline,
@@ -392,9 +392,8 @@ impl InlineFormattingContext {
         }
     }
 
-    /// Calculate vertical offset for alignment.
-    fn calculate_vertical_offset(
-        &self,
+    /// Calculate vertical offset for alignment (static version).
+    fn calculate_vertical_offset_for(
         tree: &LayoutTree,
         box_id: LayoutBoxId,
         line_baseline: f32,
@@ -433,16 +432,17 @@ impl InlineFormattingContext {
         style: &ComputedStyle,
         containing_block: &ContainingBlock,
     ) -> f32 {
-        use style::computed::LengthPercentageAuto;
+        use style::computed::SizeValue;
 
         match &style.width {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => containing_block.width * p / 100.0,
-            LengthPercentageAuto::Auto => {
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => containing_block.width * p / 100.0,
+            SizeValue::Auto => {
                 // Shrink-to-fit width
                 // For now, use a default
                 100.0
             }
+            _ => 100.0,
         }
     }
 
@@ -452,18 +452,19 @@ impl InlineFormattingContext {
         style: &ComputedStyle,
         containing_block: &ContainingBlock,
     ) -> f32 {
-        use style::computed::LengthPercentageAuto;
+        use style::computed::SizeValue;
 
         match &style.height {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => {
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => {
                 if let Some(h) = containing_block.height {
                     h * p / 100.0
                 } else {
                     style.font_size * 1.2
                 }
             }
-            LengthPercentageAuto::Auto => style.font_size * 1.2,
+            SizeValue::Auto => style.font_size * 1.2,
+            _ => style.font_size * 1.2,
         }
     }
 

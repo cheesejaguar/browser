@@ -435,7 +435,7 @@ impl ElementData {
     /// Check if this element matches a simple selector.
     pub fn matches_selector(&self, selector: &SimpleSelector) -> bool {
         match selector {
-            SimpleSelector::Tag(tag) => self.tag_name == *tag,
+            SimpleSelector::Tag(tag) => self.tag_name.as_str() == tag,
             SimpleSelector::Id(id) => self.id.as_ref().map(|i| i.as_ref()) == Some(id.as_str()),
             SimpleSelector::Class(class) => self.has_class(class),
             SimpleSelector::Attribute { name, op, value } => {

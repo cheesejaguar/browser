@@ -96,6 +96,11 @@ pub struct ComputedStyle {
     pub grid_template_columns: Vec<GridTrack>,
     pub grid_template_rows: Vec<GridTrack>,
     pub grid_auto_flow: GridAutoFlow,
+    pub grid_column_start: i32,
+    pub grid_column_end: i32,
+    pub grid_row_start: i32,
+    pub grid_row_end: i32,
+    pub justify_items: JustifyItems,
 
     /// Transform.
     pub transform: Vec<Transform>,
@@ -199,6 +204,11 @@ impl ComputedStyle {
             grid_template_columns: Vec::new(),
             grid_template_rows: Vec::new(),
             grid_auto_flow: GridAutoFlow::Row,
+            grid_column_start: 0,
+            grid_column_end: 0,
+            grid_row_start: 0,
+            grid_row_end: 0,
+            justify_items: JustifyItems::Normal,
             transform: Vec::new(),
             transform_origin: (50.0, 50.0),
             cursor: Cursor::Auto,
@@ -701,6 +711,46 @@ pub enum GridAutoFlow {
     RowDense,
     ColumnDense,
 }
+
+/// Grid line placement value.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum GridLine {
+    #[default]
+    Auto,
+    Line(i32),
+    Span(i32),
+    Named(String),
+}
+
+/// Grid template track definition.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum GridTemplateTrack {
+    #[default]
+    None,
+    TrackList(Vec<String>),
+    Subgrid,
+}
+
+/// Justify items.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum JustifyItems {
+    #[default]
+    Normal,
+    Stretch,
+    Start,
+    End,
+    Center,
+    FlexStart,
+    FlexEnd,
+    SelfStart,
+    SelfEnd,
+    Left,
+    Right,
+    Baseline,
+}
+
+/// Type alias for length/percentage/auto values.
+pub type LengthPercentageAuto = SizeValue;
 
 /// Transform function.
 #[derive(Clone, Debug, PartialEq)]

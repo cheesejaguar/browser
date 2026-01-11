@@ -109,37 +109,43 @@ impl Stylist {
 
         // Match UA rules
         for sheet in &self.ua_sheets {
-            self.collect_matching_rules(
+            Self::collect_matching_rules_from(
                 &sheet.rules,
                 element,
                 tree,
                 node_id,
                 Origin::UserAgent,
                 &mut declarations,
+                &mut self.source_order,
+                &self.media_context,
             );
         }
 
         // Match user rules
         for sheet in &self.user_sheets {
-            self.collect_matching_rules(
+            Self::collect_matching_rules_from(
                 &sheet.rules,
                 element,
                 tree,
                 node_id,
                 Origin::User,
                 &mut declarations,
+                &mut self.source_order,
+                &self.media_context,
             );
         }
 
         // Match author rules
         for sheet in &self.author_sheets {
-            self.collect_matching_rules(
+            Self::collect_matching_rules_from(
                 &sheet.rules,
                 element,
                 tree,
                 node_id,
                 Origin::Author,
                 &mut declarations,
+                &mut self.source_order,
+                &self.media_context,
             );
         }
 
@@ -164,14 +170,15 @@ impl Stylist {
         self.compute_values(cascaded, parent_style)
     }
 
-    fn collect_matching_rules(
-        &mut self,
+    fn collect_matching_rules_from(
         rules: &[CssRule],
         element: &ElementData,
         tree: &DomTree,
         node_id: NodeId,
         origin: Origin,
         declarations: &mut Vec<CascadedDeclaration>,
+        source_order: &mut u32,
+        media_context: &MediaContext,
     ) {
         for rule in rules {
             match rule {
@@ -184,33 +191,37 @@ impl Stylist {
                                 decl.clone(),
                                 specificity,
                                 origin,
-                                self.source_order,
+                                *source_order,
                             ));
-                            self.source_order += 1;
+                            *source_order += 1;
                         }
                     }
                 }
                 CssRule::Media(media_rule) => {
-                    if media_rule.media.matches(&self.media_context) {
-                        self.collect_matching_rules(
+                    if media_rule.media.matches(media_context) {
+                        Self::collect_matching_rules_from(
                             &media_rule.rules,
                             element,
                             tree,
                             node_id,
                             origin,
                             declarations,
+                            source_order,
+                            media_context,
                         );
                     }
                 }
                 CssRule::Supports(supports_rule) => {
                     // For now, assume @supports conditions are met
-                    self.collect_matching_rules(
+                    Self::collect_matching_rules_from(
                         &supports_rule.rules,
                         element,
                         tree,
                         node_id,
                         origin,
                         declarations,
+                        source_order,
+                        media_context,
                     );
                 }
                 _ => {}

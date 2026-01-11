@@ -204,13 +204,13 @@ impl BlockFormattingContext {
         for child_id in children {
             if let Some(layout_box) = tree.get_mut(child_id) {
                 // For text boxes, use the text run dimensions
-                let width = if let Some(ref text) = layout_box.text_run {
+                let width = if let Some(ref text) = layout_box.text {
                     text.width
                 } else {
                     0.0
                 };
 
-                let height = if let Some(ref text) = layout_box.text_run {
+                let height = if let Some(ref text) = layout_box.text {
                     text.height
                 } else {
                     layout_box.style.font_size
@@ -240,13 +240,14 @@ impl BlockFormattingContext {
         style: &style::computed::ComputedStyle,
         containing_block: &ContainingBlock,
     ) -> common::geometry::EdgeSizes {
-        use style::computed::LengthPercentageAuto;
+        use style::computed::SizeValue;
 
-        let resolve = |value: &LengthPercentageAuto| -> f32 {
+        let resolve = |value: &SizeValue| -> f32 {
             match value {
-                LengthPercentageAuto::Length(l) => *l,
-                LengthPercentageAuto::Percentage(p) => containing_block.width * p / 100.0,
-                LengthPercentageAuto::Auto => 0.0,
+                SizeValue::Length(l) => *l,
+                SizeValue::Percentage(p) => containing_block.width * p / 100.0,
+                SizeValue::Auto => 0.0,
+                _ => 0.0,
             }
         };
 
@@ -274,12 +275,13 @@ impl BlockFormattingContext {
         style: &style::computed::ComputedStyle,
         containing_block: &ContainingBlock,
     ) -> common::geometry::EdgeSizes {
-        use style::computed::LengthPercentage;
+        use style::computed::SizeValue;
 
-        let resolve = |value: &LengthPercentage| -> f32 {
+        let resolve = |value: &SizeValue| -> f32 {
             match value {
-                LengthPercentage::Length(l) => *l,
-                LengthPercentage::Percentage(p) => containing_block.width * p / 100.0,
+                SizeValue::Length(l) => *l,
+                SizeValue::Percentage(p) => containing_block.width * p / 100.0,
+                _ => 0.0,
             }
         };
 
@@ -300,18 +302,19 @@ impl BlockFormattingContext {
         border: &common::geometry::EdgeSizes,
         padding: &common::geometry::EdgeSizes,
     ) -> f32 {
-        use style::computed::LengthPercentageAuto;
+        use style::computed::SizeValue;
 
         let horizontal_space = margin.left + border.left + padding.left
             + padding.right + border.right + margin.right;
 
         match &style.width {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => containing_block.width * p / 100.0,
-            LengthPercentageAuto::Auto => {
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => containing_block.width * p / 100.0,
+            SizeValue::Auto => {
                 // Fill available space
                 (containing_block.width - horizontal_space).max(0.0)
             }
+            _ => (containing_block.width - horizontal_space).max(0.0),
         }
     }
 
@@ -323,11 +326,11 @@ impl BlockFormattingContext {
         width: f32,
         margin: &common::geometry::EdgeSizes,
     ) -> f32 {
-        use style::computed::LengthPercentageAuto;
+        use style::computed::SizeValue;
 
         // Handle auto margins for centering
-        let left_auto = matches!(style.margin.left, LengthPercentageAuto::Auto);
-        let right_auto = matches!(style.margin.right, LengthPercentageAuto::Auto);
+        let left_auto = matches!(style.margin.left, SizeValue::Auto);
+        let right_auto = matches!(style.margin.right, SizeValue::Auto);
 
         if left_auto && right_auto {
             // Center the box
@@ -349,18 +352,19 @@ impl BlockFormattingContext {
         style: &style::computed::ComputedStyle,
         containing_block: &ContainingBlock,
     ) -> f32 {
-        use style::computed::LengthPercentageAuto;
+        use style::computed::SizeValue;
 
         match &style.height {
-            LengthPercentageAuto::Length(l) => *l,
-            LengthPercentageAuto::Percentage(p) => {
+            SizeValue::Length(l) => *l,
+            SizeValue::Percentage(p) => {
                 if let Some(cb_height) = containing_block.height {
                     cb_height * p / 100.0
                 } else {
                     self.calculate_content_height(tree, box_id)
                 }
             }
-            LengthPercentageAuto::Auto => self.calculate_content_height(tree, box_id),
+            SizeValue::Auto => self.calculate_content_height(tree, box_id),
+            _ => self.calculate_content_height(tree, box_id),
         }
     }
 
@@ -371,8 +375,8 @@ impl BlockFormattingContext {
         if children.is_empty() {
             // Check for text content
             if let Some(layout_box) = tree.get(box_id) {
-                if let Some(ref text_run) = layout_box.text_run {
-                    return text_run.height;
+                if let Some(ref text) = layout_box.text {
+                    return text.height;
                 }
             }
             return 0.0;
