@@ -289,12 +289,15 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let pixel_size = 1.0 / tex_size;
     let offset = uniforms.direction * pixel_size * uniforms.radius;
 
-    var color = textureSample(t_source, s_source, input.tex_coord) * WEIGHTS[0];
+    // A const array can only be indexed by a constant; copy it to a local
+    // so the loop can index it dynamically.
+    var weights = WEIGHTS;
+    var color = textureSample(t_source, s_source, input.tex_coord) * weights[0];
 
     for (var i = 1; i < 5; i = i + 1) {
         let sample_offset = offset * f32(i);
-        color += textureSample(t_source, s_source, input.tex_coord + sample_offset) * WEIGHTS[i];
-        color += textureSample(t_source, s_source, input.tex_coord - sample_offset) * WEIGHTS[i];
+        color += textureSample(t_source, s_source, input.tex_coord + sample_offset) * weights[i];
+        color += textureSample(t_source, s_source, input.tex_coord - sample_offset) * weights[i];
     }
 
     return color;
@@ -383,15 +386,49 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 mod tests {
     use super::*;
 
+    use wgpu::naga;
+
+    /// Every shader must be valid WGSL and expose the `vs_main` / `fs_main`
+    /// entry points that the render pipelines reference. Validation runs on
+    /// the CPU through naga, so no GPU is needed.
     #[test]
-    fn test_shader_strings() {
-        // Just verify the shaders are not empty
-        assert!(!SOLID_COLOR_SHADER.is_empty());
-        assert!(!TEXTURED_SHADER.is_empty());
-        assert!(!TEXT_SHADER.is_empty());
-        assert!(!GRADIENT_SHADER.is_empty());
-        assert!(!SHADOW_SHADER.is_empty());
-        assert!(!BLUR_SHADER.is_empty());
-        assert!(!ROUNDED_RECT_SHADER.is_empty());
+    fn test_shaders_are_valid_wgsl() {
+        let shaders = [
+            ("SOLID_COLOR_SHADER", SOLID_COLOR_SHADER),
+            ("TEXTURED_SHADER", TEXTURED_SHADER),
+            ("TEXT_SHADER", TEXT_SHADER),
+            ("GRADIENT_SHADER", GRADIENT_SHADER),
+            ("SHADOW_SHADER", SHADOW_SHADER),
+            ("BLUR_SHADER", BLUR_SHADER),
+            ("ROUNDED_RECT_SHADER", ROUNDED_RECT_SHADER),
+        ];
+
+        for (name, source) in shaders {
+            let module = naga::front::wgsl::parse_str(source)
+                .unwrap_or_else(|e| panic!("{} failed to parse: {}", name, e.emit_to_string(source)));
+
+            naga::valid::Validator::new(
+                naga::valid::ValidationFlags::all(),
+                naga::valid::Capabilities::default(),
+            )
+            .validate(&module)
+            .unwrap_or_else(|e| panic!("{} failed validation: {:?}", name, e));
+
+            let entry_points: Vec<(&str, naga::ShaderStage)> = module
+                .entry_points
+                .iter()
+                .map(|ep| (ep.name.as_str(), ep.stage))
+                .collect();
+            assert!(
+                entry_points.contains(&("vs_main", naga::ShaderStage::Vertex)),
+                "{} has no vs_main vertex entry point",
+                name
+            );
+            assert!(
+                entry_points.contains(&("fs_main", naga::ShaderStage::Fragment)),
+                "{} has no fs_main fragment entry point",
+                name
+            );
+        }
     }
 }

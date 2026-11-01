@@ -331,8 +331,17 @@ mod tests {
         let mut child = DocumentSandbox::new(Sandbox::parse("allow-scripts allow-forms"), true);
         child.set_parent(parent);
 
-        // Child allows forms, but check inheritance
+        // Both levels allow scripts.
         assert!(child.allows_action(|s| s.allows_scripts()));
-        assert!(child.allows_action(|s| s.allows_forms()));
+
+        // The child's own attribute allows forms, but a nested browsing context
+        // can never relax its parent's sandbox: the parent blocks forms, so the
+        // effective policy for the child blocks them too.
+        assert!(child.sandbox.allows_forms());
+        assert!(!child.allows_action(|s| s.allows_forms()));
+
+        let effective = child.effective_flags();
+        assert!(effective.contains(SandboxFlags::FORMS));
+        assert!(!effective.contains(SandboxFlags::SCRIPTS));
     }
 }

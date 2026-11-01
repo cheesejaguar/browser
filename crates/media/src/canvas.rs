@@ -682,8 +682,20 @@ mod tests {
         ctx.set_fill_style("#ff0000");
         ctx.fill_rect(10.0, 10.0, 20.0, 20.0);
 
+        let pixel = |data: &[u8], x: usize, y: usize| {
+            let idx = (y * 100 + x) * 4;
+            [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]]
+        };
+
         let data = ctx.get_data();
-        assert!(!data.is_empty());
+        assert_eq!(data.len(), 100 * 100 * 4);
+        // Inside the filled rect (10..30, 10..30).
+        assert_eq!(pixel(data, 10, 10), [255, 0, 0, 255]);
+        assert_eq!(pixel(data, 29, 29), [255, 0, 0, 255]);
+        // Just outside it, and far away.
+        assert_eq!(pixel(data, 30, 30), [0, 0, 0, 0]);
+        assert_eq!(pixel(data, 9, 15), [0, 0, 0, 0]);
+        assert_eq!(pixel(data, 50, 50), [0, 0, 0, 0]);
     }
 
     #[test]
@@ -709,5 +721,17 @@ mod tests {
         let image_data = ctx.get_image_data(0, 0, 10, 10);
         assert_eq!(image_data.width, 10);
         assert_eq!(image_data.height, 10);
+        assert_eq!(image_data.data.len(), 10 * 10 * 4);
+        assert!(image_data.data.chunks(4).all(|p| p == [255, 0, 0, 255]));
+
+        // A region straddling the filled area: left half red, right half clear.
+        let image_data = ctx.get_image_data(5, 0, 10, 1);
+        let pixels: Vec<&[u8]> = image_data.data.chunks(4).collect();
+        assert!(pixels[..5].iter().all(|p| *p == [255, 0, 0, 255]));
+        assert!(pixels[5..].iter().all(|p| *p == [0, 0, 0, 0]));
+
+        // Out-of-bounds pixels read back as transparent black.
+        let image_data = ctx.get_image_data(98, 98, 4, 1);
+        assert_eq!(&image_data.data[8..], &[0u8; 8][..]);
     }
 }

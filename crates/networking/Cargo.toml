@@ -31,3 +31,4 @@ brotli.workspace = true
 mime = "0.3"
 encoding_rs = "0.8"
 bytes = "1.7"
+serde_urlencoded = "0.7"
