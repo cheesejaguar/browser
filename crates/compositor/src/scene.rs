@@ -33,7 +33,7 @@ impl Scene {
         Self {
             layer_tree: tree,
             bounds: Rect::new(0.0, 0.0, width, height),
-            background: common::color::Color::white(),
+            background: common::color::Color::WHITE,
             scroll_position: Point::new(0.0, 0.0),
             dirty_regions: Vec::new(),
         }

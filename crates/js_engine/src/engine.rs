@@ -179,7 +179,7 @@ pub enum JsEngineError {
 fn format_js_error(error: &JsError, context: &mut Context) -> String {
     error
         .try_native(context)
-        .map(|e| e.message().to_std_string_escaped())
+        .map(|e| e.message().to_string())
         .unwrap_or_else(|_| "Unknown error".to_string())
 }
 

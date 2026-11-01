@@ -61,11 +61,11 @@ impl ImageData {
     /// Get pixel at position.
     pub fn get_pixel(&self, x: u32, y: u32) -> Color {
         if x >= self.width || y >= self.height {
-            return Color::transparent();
+            return Color::TRANSPARENT;
         }
 
         let offset = ((y * self.width + x) * 4) as usize;
-        Color::new(
+        Color::rgba(
             self.data[offset],
             self.data[offset + 1],
             self.data[offset + 2],

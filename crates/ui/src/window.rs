@@ -262,13 +262,25 @@ impl BrowserWindow {
 
     /// Update the UI based on tab state.
     pub fn update_ui(&mut self) {
-        if let Some(tab) = self.active_tab() {
-            self.address_bar.set_url(&tab.url());
-            self.navigation_bar.set_can_go_back(tab.can_go_back());
-            self.navigation_bar.set_can_go_forward(tab.can_go_forward());
-            self.navigation_bar.set_loading(tab.is_loading());
-            self.tab_bar.set_tab_title(tab.id(), tab.title().to_string());
-        }
+        let Some((url, can_go_back, can_go_forward, is_loading, tab_id, title)) =
+            self.active_tab().map(|tab| {
+                (
+                    tab.url().to_string(),
+                    tab.can_go_back(),
+                    tab.can_go_forward(),
+                    tab.is_loading(),
+                    tab.id(),
+                    tab.title().to_string(),
+                )
+            })
+        else {
+            return;
+        };
+        self.address_bar.set_url(&url);
+        self.navigation_bar.set_can_go_back(can_go_back);
+        self.navigation_bar.set_can_go_forward(can_go_forward);
+        self.navigation_bar.set_loading(is_loading);
+        self.tab_bar.set_tab_title(tab_id, title);
     }
 }
 

@@ -18,3 +18,5 @@ tracing.workspace = true
 tokio.workspace = true
 fontdue.workspace = true
 image.workspace = true
+urlencoding = "2.1"
+chrono = { version = "0.4", default-features = false, features = ["std"] }

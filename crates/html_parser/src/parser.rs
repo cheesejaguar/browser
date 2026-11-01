@@ -1,6 +1,7 @@
 //! HTML Parser implementation.
 
 use crate::tree_builder::DomTreeSink;
+use markup5ever::namespace_url;
 use dom::document::Document;
 use dom::element::{ElementData, TagName};
 use dom::node::NodeId;

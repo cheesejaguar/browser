@@ -19,3 +19,7 @@ url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 base64 = "0.22"
+boa_engine.workspace = true
+rand = "0.8"
+form_urlencoded = "1.2"
+urlencoding = "2.1"

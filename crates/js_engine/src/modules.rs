@@ -95,20 +95,26 @@ impl ModuleLoader {
         context: &mut Context,
     ) -> Result<JsValue, ModuleError> {
         let url = self.get_url(id).ok_or(ModuleError::NotFound)?;
-        let module = self
+        let state = self
             .modules
-            .get_mut(&url)
-            .ok_or(ModuleError::NotFound)?;
+            .get(&url)
+            .ok_or(ModuleError::NotFound)?
+            .state;
 
-        if module.state == ModuleState::Evaluated {
+        if state == ModuleState::Evaluated {
             // Return cached namespace
             return Ok(JsValue::undefined()); // Would return namespace object
         }
 
         // Ensure linked
-        if module.state == ModuleState::Parsed {
+        if state == ModuleState::Parsed {
             self.link_module(id, context)?;
         }
+
+        let module = self
+            .modules
+            .get_mut(&url)
+            .ok_or(ModuleError::NotFound)?;
 
         // Evaluate the module
         let module_obj = module.module.clone();

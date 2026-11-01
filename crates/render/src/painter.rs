@@ -2,8 +2,8 @@
 
 use crate::display_list::{
     BlendMode, BorderItem, BorderStyle, BoxShadowItem, ClipRegion, DisplayItem, DisplayItemType,
-    DisplayList, FontKey, FontStyle, GlyphInstance, GradientStop, ImageItem, ImageKey,
-    ImageRendering, LinearGradientItem, LineItem, LineStyle, RadialGradientItem, SolidColorItem,
+    DisplayList, FontKey, FontStyle, GlyphInstance, ImageItem, ImageKey,
+    ImageRendering, LineItem, LineStyle, SolidColorItem,
     StackingContext, TextItem,
 };
 use common::color::Color;
@@ -12,10 +12,7 @@ use dom::node::NodeId;
 use layout::layout_box::{LayoutBox, LayoutBoxId};
 use layout::tree::LayoutTree;
 use layout::BoxType;
-use style::computed::{
-    BackgroundClip, BackgroundImage, BackgroundOrigin, BackgroundRepeat, BackgroundSize,
-    ComputedStyle, Display, TextDecorationLine, Visibility,
-};
+use style::computed::{ComputedStyle, Display, TextDecoration, Visibility, ZIndex};
 
 /// Painter for generating display lists.
 pub struct Painter {
@@ -116,7 +113,7 @@ impl Painter {
         }
 
         // Positioned elements with z-index != auto
-        if !matches!(style.position, style::computed::Position::Static) && style.z_index.is_some() {
+        if !matches!(style.position, style::computed::Position::Static) && style.z_index != ZIndex::Auto {
             return true;
         }
 
@@ -126,12 +123,12 @@ impl Painter {
         }
 
         // Elements with transform
-        if !matches!(style.transform, style::computed::Transform::None) {
+        if !style.transform.is_empty() {
             return true;
         }
 
         // Flex/grid items with z-index
-        if style.z_index.is_some() {
+        if style.z_index != ZIndex::Auto {
             return true;
         }
 
@@ -150,18 +147,15 @@ impl Painter {
         let style = &layout_box.style;
         let border_rect = layout_box.border_rect();
 
-        let transform = match &style.transform {
-            style::computed::Transform::None => None,
-            style::computed::Transform::Matrix(m) => Some(Transform::new(
-                m[0], m[1], m[2], m[3], m[4], m[5],
-            )),
-            _ => None, // Handle other transform types
-        };
+        let transform = to_geometry_transform(&style.transform);
 
         let context = StackingContext {
             id,
             parent: Some(self.current_stacking_context),
-            z_index: style.z_index.unwrap_or(0),
+            z_index: match style.z_index {
+                ZIndex::Number(z) => z,
+                ZIndex::Auto => 0,
+            },
             transform,
             opacity: style.opacity,
             blend_mode: BlendMode::Normal,
@@ -184,22 +178,19 @@ impl Painter {
         &self,
         layout_box: &LayoutBox,
         border_rect: &Rect,
-        padding_rect: &Rect,
-        content_rect: &Rect,
+        _padding_rect: &Rect,
+        _content_rect: &Rect,
         display_list: &mut DisplayList,
     ) {
         let style = &layout_box.style;
 
-        // Determine background painting area
-        let bg_rect = match style.background_clip {
-            BackgroundClip::BorderBox => border_rect.clone(),
-            BackgroundClip::PaddingBox => padding_rect.clone(),
-            BackgroundClip::ContentBox => content_rect.clone(),
-        };
+        // Background painting area: the computed style has no background-clip
+        // yet, so use its initial value (border-box).
+        let bg_rect = border_rect.clone();
 
         // Paint background color
         if style.background_color.a > 0 {
-            let color = Color::new(
+            let color = Color::rgba(
                 style.background_color.r,
                 style.background_color.g,
                 style.background_color.b,
@@ -220,118 +211,6 @@ impl Painter {
 
             display_list.push(item);
         }
-
-        // Paint background images
-        self.paint_background_images(layout_box, &bg_rect, display_list);
-    }
-
-    /// Paint background images.
-    fn paint_background_images(
-        &self,
-        layout_box: &LayoutBox,
-        bg_rect: &Rect,
-        display_list: &mut DisplayList,
-    ) {
-        let style = &layout_box.style;
-
-        for bg_image in &style.background_image {
-            match bg_image {
-                BackgroundImage::None => {}
-                BackgroundImage::Url(url) => {
-                    // Create image item
-                    let image_key = ImageKey(hash_string(url));
-
-                    let item = DisplayItem::new(
-                        DisplayItemType::Image(ImageItem {
-                            image_key,
-                            src_rect: None,
-                            rendering: ImageRendering::Auto,
-                        }),
-                        bg_rect.clone(),
-                    )
-                    .with_stacking_context(self.current_stacking_context);
-
-                    display_list.push(item);
-                }
-                BackgroundImage::LinearGradient { angle, stops } => {
-                    let (start, end) = self.calculate_gradient_line(*angle, bg_rect);
-
-                    let gradient_stops: Vec<GradientStop> = stops
-                        .iter()
-                        .map(|s| GradientStop {
-                            position: s.position.unwrap_or(0.0),
-                            color: Color::new(s.color.r, s.color.g, s.color.b, s.color.a),
-                        })
-                        .collect();
-
-                    let item = DisplayItem::new(
-                        DisplayItemType::LinearGradient(LinearGradientItem {
-                            start,
-                            end,
-                            stops: gradient_stops,
-                        }),
-                        bg_rect.clone(),
-                    )
-                    .with_stacking_context(self.current_stacking_context);
-
-                    display_list.push(item);
-                }
-                BackgroundImage::RadialGradient { shape: _, stops } => {
-                    let center = Point::new(
-                        bg_rect.x + bg_rect.width / 2.0,
-                        bg_rect.y + bg_rect.height / 2.0,
-                    );
-
-                    let gradient_stops: Vec<GradientStop> = stops
-                        .iter()
-                        .map(|s| GradientStop {
-                            position: s.position.unwrap_or(0.0),
-                            color: Color::new(s.color.r, s.color.g, s.color.b, s.color.a),
-                        })
-                        .collect();
-
-                    let item = DisplayItem::new(
-                        DisplayItemType::RadialGradient(RadialGradientItem {
-                            center,
-                            radius_x: bg_rect.width / 2.0,
-                            radius_y: bg_rect.height / 2.0,
-                            stops: gradient_stops,
-                        }),
-                        bg_rect.clone(),
-                    )
-                    .with_stacking_context(self.current_stacking_context);
-
-                    display_list.push(item);
-                }
-            }
-        }
-    }
-
-    /// Calculate gradient line start and end points.
-    fn calculate_gradient_line(&self, angle: f32, rect: &Rect) -> (Point, Point) {
-        let angle_rad = angle.to_radians();
-        let sin = angle_rad.sin();
-        let cos = angle_rad.cos();
-
-        let center = Point::new(
-            rect.x + rect.width / 2.0,
-            rect.y + rect.height / 2.0,
-        );
-
-        // Calculate gradient line length
-        let length = (rect.width * cos.abs() + rect.height * sin.abs()) / 2.0;
-
-        let start = Point::new(
-            center.x - length * sin,
-            center.y - length * cos,
-        );
-
-        let end = Point::new(
-            center.x + length * sin,
-            center.y + length * cos,
-        );
-
-        (start, end)
     }
 
     /// Paint borders.
@@ -356,25 +235,25 @@ impl Painter {
         ];
 
         let colors = [
-            Color::new(
+            Color::rgba(
                 style.border_color.top.r,
                 style.border_color.top.g,
                 style.border_color.top.b,
                 style.border_color.top.a,
             ),
-            Color::new(
+            Color::rgba(
                 style.border_color.right.r,
                 style.border_color.right.g,
                 style.border_color.right.b,
                 style.border_color.right.a,
             ),
-            Color::new(
+            Color::rgba(
                 style.border_color.bottom.r,
                 style.border_color.bottom.g,
                 style.border_color.bottom.b,
                 style.border_color.bottom.a,
             ),
-            Color::new(
+            Color::rgba(
                 style.border_color.left.r,
                 style.border_color.left.g,
                 style.border_color.left.b,
@@ -435,7 +314,7 @@ impl Painter {
         let style = &layout_box.style;
 
         for shadow in &style.box_shadow {
-            let color = Color::new(
+            let color = Color::rgba(
                 shadow.color.r,
                 shadow.color.g,
                 shadow.color.b,
@@ -506,12 +385,12 @@ impl Painter {
     ) {
         let style = &layout_box.style;
 
-        let text_run = match &layout_box.text_run {
+        let text_run = match &layout_box.text {
             Some(tr) => tr,
             None => return,
         };
 
-        let color = Color::new(
+        let color = Color::rgba(
             style.color.r,
             style.color.g,
             style.color.b,
@@ -532,7 +411,7 @@ impl Painter {
 
         let font_key = FontKey {
             family: style.font_family.first().cloned().unwrap_or_else(|| "sans-serif".to_string()),
-            weight: style.font_weight as u16,
+            weight: style.font_weight.to_number(),
             style: if style.font_style == style::computed::FontStyle::Italic {
                 FontStyle::Italic
             } else {
@@ -569,22 +448,14 @@ impl Painter {
     ) {
         let style = &layout_box.style;
 
-        let decoration_color = if style.text_decoration_color.a > 0 {
-            Color::new(
-                style.text_decoration_color.r,
-                style.text_decoration_color.g,
-                style.text_decoration_color.b,
-                style.text_decoration_color.a,
-            )
-        } else {
-            Color::new(style.color.r, style.color.g, style.color.b, style.color.a)
-        };
+        let decoration_color =
+            Color::rgba(style.color.r, style.color.g, style.color.b, style.color.a);
 
         let line_thickness = style.font_size * 0.05; // Approximate
 
-        for decoration in &style.text_decoration_line {
-            match decoration {
-                TextDecorationLine::Underline => {
+        {
+            match style.text_decoration {
+                TextDecoration::Underline => {
                     let y = content_rect.y + text_run.baseline() + text_run.descent * 0.3;
                     self.paint_decoration_line(
                         content_rect.x,
@@ -592,11 +463,11 @@ impl Painter {
                         text_run.width,
                         line_thickness,
                         decoration_color.clone(),
-                        &style.text_decoration_style,
+                        LineStyle::Solid,
                         display_list,
                     );
                 }
-                TextDecorationLine::Overline => {
+                TextDecoration::Overline => {
                     let y = content_rect.y;
                     self.paint_decoration_line(
                         content_rect.x,
@@ -604,11 +475,11 @@ impl Painter {
                         text_run.width,
                         line_thickness,
                         decoration_color.clone(),
-                        &style.text_decoration_style,
+                        LineStyle::Solid,
                         display_list,
                     );
                 }
-                TextDecorationLine::LineThrough => {
+                TextDecoration::LineThrough => {
                     let y = content_rect.y + text_run.ascent * 0.5;
                     self.paint_decoration_line(
                         content_rect.x,
@@ -616,11 +487,11 @@ impl Painter {
                         text_run.width,
                         line_thickness,
                         decoration_color.clone(),
-                        &style.text_decoration_style,
+                        LineStyle::Solid,
                         display_list,
                     );
                 }
-                TextDecorationLine::None => {}
+                TextDecoration::None => {}
             }
         }
     }
@@ -633,16 +504,9 @@ impl Painter {
         width: f32,
         thickness: f32,
         color: Color,
-        style: &style::computed::TextDecorationStyle,
+        line_style: LineStyle,
         display_list: &mut DisplayList,
     ) {
-        let line_style = match style {
-            style::computed::TextDecorationStyle::Solid => LineStyle::Solid,
-            style::computed::TextDecorationStyle::Double => LineStyle::Solid, // TODO: Double lines
-            style::computed::TextDecorationStyle::Dotted => LineStyle::Dotted,
-            style::computed::TextDecorationStyle::Dashed => LineStyle::Dashed,
-            style::computed::TextDecorationStyle::Wavy => LineStyle::Wavy,
-        };
 
         let item = DisplayItem::new(
             DisplayItemType::Line(LineItem {
@@ -666,12 +530,16 @@ impl Painter {
         content_rect: &Rect,
         display_list: &mut DisplayList,
     ) {
-        let replaced = match &layout_box.replaced {
-            Some(r) => r,
-            None => return,
-        };
+        if layout_box.replaced.is_none() {
+            return;
+        }
 
-        let image_key = ImageKey(replaced.content_id);
+        // Replaced content carries no image identifier of its own; key the
+        // image by the DOM node that generated this box.
+        let Some(node) = layout_box.node else {
+            return;
+        };
+        let image_key = ImageKey(hash_string(&format!("{:?}", node)));
 
         let item = DisplayItem::new(
             DisplayItemType::Image(ImageItem {
@@ -746,7 +614,7 @@ impl Painter {
             border_rect.height + 2.0 * (style.outline_offset + style.outline_width),
         );
 
-        let color = Color::new(
+        let color = Color::rgba(
             style.outline_color.r,
             style.outline_color.g,
             style.outline_color.b,
@@ -775,6 +643,39 @@ impl Default for Painter {
 }
 
 /// Simple hash function for strings (used for image keys).
+/// Convert a computed `transform` list to a 2D affine transform.
+///
+/// Functions are applied right-to-left as in CSS. Returns `None` when there is
+/// no transform or when it contains functions without a 2D affine mapping here.
+fn to_geometry_transform(list: &[style::computed::Transform]) -> Option<Transform> {
+    use style::computed::Transform as T;
+    if list.is_empty() {
+        return None;
+    }
+    let mut acc = Transform::identity();
+    for t in list.iter().rev() {
+        let m = match *t {
+            T::Translate(x, y) => Transform::translation(x, y),
+            T::TranslateX(x) => Transform::translation(x, 0.0),
+            T::TranslateY(y) => Transform::translation(0.0, y),
+            T::Scale(x, y) => Transform::scale(x, y),
+            T::ScaleX(x) => Transform::scale(x, 1.0),
+            T::ScaleY(y) => Transform::scale(1.0, y),
+            T::Matrix(a, b, c, d, e, f) => Transform {
+                m11: a,
+                m12: b,
+                m21: c,
+                m22: d,
+                m31: e,
+                m32: f,
+            },
+            _ => return None,
+        };
+        acc = acc.then(&m);
+    }
+    Some(acc)
+}
+
 fn hash_string(s: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();

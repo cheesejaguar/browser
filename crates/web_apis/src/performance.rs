@@ -119,7 +119,7 @@ impl Performance {
         let mut entries: Vec<PerformanceEntry> = self
             .entries
             .iter()
-            .filter(|e| e.entry_type == entry_type)
+            .filter(|e| e.entry_type() == entry_type)
             .cloned()
             .collect();
 
@@ -146,7 +146,7 @@ impl Performance {
             .entries
             .iter()
             .filter(|e| {
-                e.name() == name && entry_type.map(|t| e.entry_type == t).unwrap_or(true)
+                e.name() == name && entry_type.map(|t| e.entry_type() == t).unwrap_or(true)
             })
             .cloned()
             .collect();
@@ -186,7 +186,7 @@ impl Performance {
 
     /// Clear resource timings.
     pub fn clear_resource_timings(&mut self) {
-        self.entries.retain(|e| e.entry_type != "resource");
+        self.entries.retain(|e| e.entry_type() != "resource");
     }
 
     /// Set resource timing buffer size.
@@ -197,10 +197,10 @@ impl Performance {
     /// Add a resource timing entry.
     pub fn add_resource_timing(&mut self, entry: ResourceTiming) {
         // Check buffer size
-        let resource_count = self.entries.iter().filter(|e| e.entry_type == "resource").count();
+        let resource_count = self.entries.iter().filter(|e| e.entry_type() == "resource").count();
         if resource_count >= self.resource_timing_buffer_size {
             // Remove oldest resource entry
-            if let Some(pos) = self.entries.iter().position(|e| e.entry_type == "resource") {
+            if let Some(pos) = self.entries.iter().position(|e| e.entry_type() == "resource") {
                 self.entries.remove(pos);
             }
         }
@@ -211,7 +211,7 @@ impl Performance {
     /// Add a navigation timing entry.
     pub fn set_navigation_timing(&mut self, entry: NavigationTiming) {
         // Remove existing navigation entry
-        self.entries.retain(|e| e.entry_type != "navigation");
+        self.entries.retain(|e| e.entry_type() != "navigation");
         self.entries.push_front(PerformanceEntry::Navigation(entry));
     }
 

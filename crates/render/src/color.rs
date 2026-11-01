@@ -181,7 +181,7 @@ impl ColorManip {
         let (h, s, l) = ColorSpace::rgb_to_hsl(color.r, color.g, color.b);
         let l = (l + amount).clamp(0.0, 1.0);
         let (r, g, b) = ColorSpace::hsl_to_rgb(h, s, l);
-        Color::new(r, g, b, color.a)
+        Color::rgba(r, g, b, color.a)
     }
 
     /// Darken a color.
@@ -189,7 +189,7 @@ impl ColorManip {
         let (h, s, l) = ColorSpace::rgb_to_hsl(color.r, color.g, color.b);
         let l = (l - amount).clamp(0.0, 1.0);
         let (r, g, b) = ColorSpace::hsl_to_rgb(h, s, l);
-        Color::new(r, g, b, color.a)
+        Color::rgba(r, g, b, color.a)
     }
 
     /// Saturate a color.
@@ -197,7 +197,7 @@ impl ColorManip {
         let (h, s, l) = ColorSpace::rgb_to_hsl(color.r, color.g, color.b);
         let s = (s + amount).clamp(0.0, 1.0);
         let (r, g, b) = ColorSpace::hsl_to_rgb(h, s, l);
-        Color::new(r, g, b, color.a)
+        Color::rgba(r, g, b, color.a)
     }
 
     /// Desaturate a color.
@@ -205,7 +205,7 @@ impl ColorManip {
         let (h, s, l) = ColorSpace::rgb_to_hsl(color.r, color.g, color.b);
         let s = (s - amount).clamp(0.0, 1.0);
         let (r, g, b) = ColorSpace::hsl_to_rgb(h, s, l);
-        Color::new(r, g, b, color.a)
+        Color::rgba(r, g, b, color.a)
     }
 
     /// Adjust hue.
@@ -213,12 +213,12 @@ impl ColorManip {
         let (h, s, l) = ColorSpace::rgb_to_hsl(color.r, color.g, color.b);
         let h = (h + degrees / 360.0).rem_euclid(1.0);
         let (r, g, b) = ColorSpace::hsl_to_rgb(h, s, l);
-        Color::new(r, g, b, color.a)
+        Color::rgba(r, g, b, color.a)
     }
 
     /// Invert a color.
     pub fn invert(color: &Color) -> Color {
-        Color::new(
+        Color::rgba(
             255 - color.r,
             255 - color.g,
             255 - color.b,
@@ -229,7 +229,7 @@ impl ColorManip {
     /// Get grayscale version.
     pub fn grayscale(color: &Color) -> Color {
         let gray = ((color.r as u32 + color.g as u32 + color.b as u32) / 3) as u8;
-        Color::new(gray, gray, gray, color.a)
+        Color::rgba(gray, gray, gray, color.a)
     }
 
     /// Get sepia version.
@@ -242,7 +242,7 @@ impl ColorManip {
         let new_g = (0.349 * r + 0.686 * g + 0.168 * b).min(255.0) as u8;
         let new_b = (0.272 * r + 0.534 * g + 0.131 * b).min(255.0) as u8;
 
-        Color::new(new_r, new_g, new_b, color.a)
+        Color::rgba(new_r, new_g, new_b, color.a)
     }
 
     /// Mix two colors.
@@ -250,7 +250,7 @@ impl ColorManip {
         let w = weight.clamp(0.0, 1.0);
         let w1 = 1.0 - w;
 
-        Color::new(
+        Color::rgba(
             (color1.r as f32 * w1 + color2.r as f32 * w) as u8,
             (color1.g as f32 * w1 + color2.g as f32 * w) as u8,
             (color1.b as f32 * w1 + color2.b as f32 * w) as u8,
@@ -300,11 +300,11 @@ impl PremultipliedAlpha {
     /// Convert from premultiplied alpha.
     pub fn unpremultiply(r: u8, g: u8, b: u8, a: u8) -> Color {
         if a == 0 {
-            return Color::transparent();
+            return Color::TRANSPARENT;
         }
 
         let a_f = a as f32 / 255.0;
-        Color::new(
+        Color::rgba(
             (r as f32 / a_f).min(255.0) as u8,
             (g as f32 / a_f).min(255.0) as u8,
             (b as f32 / a_f).min(255.0) as u8,
@@ -364,8 +364,8 @@ mod tests {
 
     #[test]
     fn test_contrast_ratio() {
-        let white = Color::white();
-        let black = Color::black();
+        let white = Color::WHITE;
+        let black = Color::BLACK;
 
         let ratio = ColorSpace::contrast_ratio(&white, &black);
         assert!((ratio - 21.0).abs() < 0.1);

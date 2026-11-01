@@ -94,7 +94,7 @@ impl JsContext {
                 }
 
                 // Check if preventDefault was called
-                if let Ok(prevented_value) = event_object.as_object().and_then(|obj| {
+                if let Some(prevented_value) = event_object.as_object().and_then(|obj| {
                     obj.get(js_string!("defaultPrevented"), &mut self.context).ok()
                 }) {
                     if let Some(true) = prevented_value.as_boolean() {

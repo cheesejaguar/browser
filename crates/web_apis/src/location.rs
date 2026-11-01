@@ -54,9 +54,9 @@ impl Location {
     }
 
     /// Set the protocol.
-    pub fn set_protocol(&mut self, protocol: &str) -> Result<(), url::ParseError> {
+    pub fn set_protocol(&mut self, protocol: &str) -> Result<(), ()> {
         let protocol = protocol.trim_end_matches(':');
-        self.url.set_scheme(protocol).map_err(|_| url::ParseError::InvalidScheme)
+        self.url.set_scheme(protocol)
     }
 
     /// Get the host (hostname:port).
