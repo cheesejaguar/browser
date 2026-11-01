@@ -197,7 +197,7 @@ impl ResourceLoader {
 
         // Check for duplicate in-flight request
         if self.config.deduplicate {
-            if let Some(receiver) = self.get_in_flight(&url) {
+            if let Some(mut receiver) = self.get_in_flight(&url) {
                 // Wait for the existing request
                 return receiver
                     .recv()

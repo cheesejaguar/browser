@@ -31,7 +31,6 @@ rust-version = "1.75"
 # Parsing
 html5ever = "0.27"
 markup5ever = "0.12"
-markup5ever_rcdom = "0.3"
 cssparser = "0.34"
 selectors = "0.26"
 

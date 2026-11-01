@@ -283,8 +283,13 @@ mod tests {
             .with_album("Album Name");
 
         session.set_metadata(Some(metadata));
-        assert!(session.metadata().is_some());
-        assert_eq!(session.metadata().unwrap().title, "Song Title");
+        let stored = session.metadata().unwrap();
+        assert_eq!(stored.title, "Song Title");
+        assert_eq!(stored.artist, "Artist Name");
+        assert_eq!(stored.album, "Album Name");
+
+        session.set_metadata(None);
+        assert!(session.metadata().is_none());
     }
 
     #[test]

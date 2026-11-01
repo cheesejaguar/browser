@@ -375,6 +375,18 @@ mod tests {
         ]);
 
         let expanded = expand_shorthand(&PropertyId::Margin, &value);
-        assert_eq!(expanded.len(), 4);
+        let px: Vec<(PropertyId, Option<f32>)> = expanded
+            .iter()
+            .map(|(id, v)| (id.clone(), v.as_px()))
+            .collect();
+        assert_eq!(
+            px,
+            vec![
+                (PropertyId::MarginTop, Some(10.0)),
+                (PropertyId::MarginRight, Some(20.0)),
+                (PropertyId::MarginBottom, Some(10.0)),
+                (PropertyId::MarginLeft, Some(20.0)),
+            ]
+        );
     }
 }

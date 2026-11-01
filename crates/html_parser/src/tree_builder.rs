@@ -6,8 +6,9 @@ use dom::node::{DocumentType, NodeData, NodeId};
 use html5ever::interface::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
 use html5ever::tendril::StrTendril;
 use html5ever::{Attribute, ExpandedName, QualName};
+use markup5ever::namespace_url;
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Handle for nodes in the tree sink.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,6 +19,11 @@ pub struct DomTreeSink<'a> {
     document: &'a mut Document,
     /// Nodes that have been removed but might be re-parented.
     pending_nodes: HashSet<NodeId>,
+    /// Qualified names of elements created by this sink, so that
+    /// `elem_name` can hand out references that outlive the call.
+    element_names: HashMap<NodeId, QualName>,
+    /// Name reported for nodes that are not elements created by this sink.
+    fallback_name: QualName,
 }
 
 impl<'a> DomTreeSink<'a> {
@@ -25,6 +31,8 @@ impl<'a> DomTreeSink<'a> {
         Self {
             document,
             pending_nodes: HashSet::new(),
+            element_names: HashMap::new(),
+            fallback_name: QualName::new(None, html5ever::ns!(), html5ever::LocalName::from("")),
         }
     }
 
@@ -42,39 +50,33 @@ impl<'a> DomTreeSink<'a> {
             data.set_attribute(attr.name.local.as_ref(), &attr.value);
         }
 
-        self.document.tree.create_element(data)
+        let id = self.document.tree.create_element(data);
+        self.element_names.insert(id, name.clone());
+        id
     }
 }
 
 impl<'a> TreeSink for DomTreeSink<'a> {
     type Handle = Handle;
     type Output = Self;
-    type ElemName<'b> = ExpandedName<'b> where Self: 'b;
 
     fn finish(self) -> Self::Output {
         self
     }
 
-    fn parse_error(&self, msg: Cow<'static, str>) {
+    fn parse_error(&mut self, msg: Cow<'static, str>) {
         tracing::warn!("HTML parse error: {}", msg);
     }
 
-    fn get_document(&self) -> Self::Handle {
+    fn get_document(&mut self) -> Self::Handle {
         Handle(self.document.tree.root().unwrap())
     }
 
-    fn elem_name<'b>(&'b self, target: &'b Self::Handle) -> Self::ElemName<'b> {
-        if let Some(elem) = self.document.tree.get_element(target.0) {
-            ExpandedName {
-                ns: &html5ever::ns!(html),
-                local: html5ever::LocalName::from(elem.tag_name.as_str()),
-            }
-        } else {
-            ExpandedName {
-                ns: &html5ever::ns!(),
-                local: html5ever::LocalName::from(""),
-            }
-        }
+    fn elem_name<'b>(&'b self, target: &'b Self::Handle) -> ExpandedName<'b> {
+        self.element_names
+            .get(&target.0)
+            .unwrap_or(&self.fallback_name)
+            .expanded()
     }
 
     fn create_element(
@@ -146,7 +148,7 @@ impl<'a> TreeSink for DomTreeSink<'a> {
         self.document.set_doctype(&name, &public_id, &system_id);
     }
 
-    fn get_template_contents(&self, target: &Self::Handle) -> Self::Handle {
+    fn get_template_contents(&mut self, target: &Self::Handle) -> Self::Handle {
         // Return template content (for now, just return the element itself)
         *target
     }

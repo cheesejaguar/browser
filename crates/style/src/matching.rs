@@ -362,9 +362,10 @@ mod tests {
     fn test_match_tag() {
         let selector = Selector::tag("div");
         let elem = ElementData::new(TagName::div());
-        let tree = DomTree::new();
+        let span = ElementData::new(TagName::span());
 
         assert!(match_simple_selector(&selector, &elem));
+        assert!(!match_simple_selector(&selector, &span));
     }
 
     #[test]
@@ -374,6 +375,10 @@ mod tests {
         elem.set_attribute("class", "container main");
 
         assert!(match_simple_selector(&selector, &elem));
+
+        let mut other = ElementData::new(TagName::div());
+        other.set_attribute("class", "container-fluid");
+        assert!(!match_simple_selector(&selector, &other));
     }
 
     #[test]
@@ -383,6 +388,60 @@ mod tests {
         elem.set_attribute("id", "main");
 
         assert!(match_simple_selector(&selector, &elem));
+
+        let mut other = ElementData::new(TagName::div());
+        other.set_attribute("id", "sidebar");
+        assert!(!match_simple_selector(&selector, &other));
+    }
+
+    /// Parse `css` as a single selector (e.g. "div p").
+    fn parse_one_selector(css: &str) -> Selector {
+        let sheet = css_parser::parser::parse_css(
+            &format!("{} {{}}", css),
+            url::Url::parse("about:blank").unwrap(),
+        );
+        match &sheet.rules[0] {
+            css_parser::stylesheet::CssRule::Style(rule) => rule.selectors.selectors[0].clone(),
+            other => panic!("expected a style rule, got {:?}", other),
+        }
+    }
+
+    /// Build `<div><p></p></div>` and return (tree, div, p).
+    fn div_containing_p() -> (DomTree, NodeId, NodeId) {
+        let mut tree = DomTree::new();
+        let root = tree.root().unwrap();
+        let div = tree.create_element(ElementData::new(TagName::div()));
+        let p = tree.create_element(ElementData::new(TagName::p()));
+        tree.append_child(root, div);
+        tree.append_child(div, p);
+        (tree, div, p)
+    }
+
+    fn matches_node(selector: &Selector, tree: &DomTree, id: NodeId) -> bool {
+        let elem = tree.get(id).unwrap().as_element().unwrap().clone();
+        match_selector(selector, &elem, tree, id)
+    }
+
+    #[test]
+    #[ignore = "known bug: match_selector matches the leftmost compound against the element \
+                and walks `next` up the tree, so combinators are applied in reverse \
+                (`div p` matches a <div> inside a <p>, not a <p> inside a <div>)"]
+    fn test_match_descendant_combinator() {
+        let (tree, div, p) = div_containing_p();
+        let selector = parse_one_selector("div p");
+
+        assert!(matches_node(&selector, &tree, p));
+        assert!(!matches_node(&selector, &tree, div));
+    }
+
+    #[test]
+    #[ignore = "known bug: combinators are applied in reverse (see test_match_descendant_combinator)"]
+    fn test_match_child_combinator() {
+        let (tree, div, p) = div_containing_p();
+        let selector = parse_one_selector("div > p");
+
+        assert!(matches_node(&selector, &tree, p));
+        assert!(!matches_node(&selector, &tree, div));
     }
 
     #[test]
@@ -394,5 +453,7 @@ mod tests {
         assert!(match_nth(Some("3"), 3));
         assert!(match_nth(Some("2n"), 4));
         assert!(match_nth(Some("2n+1"), 3));
+        assert!(!match_nth(Some("2n+1"), 4));
+        assert!(!match_nth(Some("3"), 4));
     }
 }

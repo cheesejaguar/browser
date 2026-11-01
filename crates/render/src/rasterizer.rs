@@ -50,11 +50,11 @@ impl PixelBuffer {
     /// Get pixel at position.
     pub fn get_pixel(&self, x: u32, y: u32) -> Color {
         if x >= self.width || y >= self.height {
-            return Color::transparent();
+            return Color::TRANSPARENT;
         }
 
         let offset = ((y * self.width + x) * 4) as usize;
-        Color::new(
+        Color::rgba(
             self.data[offset],
             self.data[offset + 1],
             self.data[offset + 2],
@@ -82,7 +82,7 @@ impl PixelBuffer {
         }
 
         let existing = self.get_pixel(x, y);
-        let blended = existing.blend(&color);
+        let blended = color.blend_over(existing);
         self.set_pixel(x, y, blended);
     }
 
@@ -119,7 +119,7 @@ impl Rasterizer {
     /// Rasterize a display list to a pixel buffer.
     pub fn rasterize(&mut self, display_list: &DisplayList, buffer: &mut PixelBuffer) {
         // Clear buffer
-        buffer.fill(Color::white());
+        buffer.fill(Color::WHITE);
 
         // Rasterize each item
         for item in display_list.items() {
@@ -338,7 +338,7 @@ impl Rasterizer {
                     let py = py as u32;
 
                     if self.is_inside_clip(px as f32, py as f32) {
-                        let glyph_color = Color::new(
+                        let glyph_color = Color::rgba(
                             color.r,
                             color.g,
                             color.b,
@@ -520,7 +520,7 @@ impl Rasterizer {
 
                 if distance < blur {
                     let alpha = ((1.0 - distance / blur) * shadow.color.a as f32) as u8;
-                    let color = Color::new(
+                    let color = Color::rgba(
                         shadow.color.r,
                         shadow.color.g,
                         shadow.color.b,
@@ -654,7 +654,7 @@ impl Rasterizer {
 /// Interpolate between gradient stops.
 fn interpolate_gradient(stops: &[GradientStop], t: f32) -> Color {
     if stops.is_empty() {
-        return Color::transparent();
+        return Color::TRANSPARENT;
     }
 
     if stops.len() == 1 {
@@ -681,7 +681,7 @@ fn interpolate_gradient(stops: &[GradientStop], t: f32) -> Color {
     }
 
     let local_t = (t - prev.position) / (next.position - prev.position);
-    Color::new(
+    Color::rgba(
         lerp_u8(prev.color.r, next.color.r, local_t),
         lerp_u8(prev.color.g, next.color.g, local_t),
         lerp_u8(prev.color.b, next.color.b, local_t),

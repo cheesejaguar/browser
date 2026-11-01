@@ -194,7 +194,13 @@ mod tests {
         let sri = SubresourceIntegrity::parse(
             "sha256-abc123 sha384-def456 sha512-ghi789",
         );
-        assert_eq!(sri.metadata.len(), 3);
+        let algorithms: Vec<_> = sri.metadata.iter().map(|m| m.algorithm).collect();
+        assert_eq!(
+            algorithms,
+            vec![HashAlgorithm::Sha256, HashAlgorithm::Sha384, HashAlgorithm::Sha512]
+        );
+        let hashes: Vec<_> = sri.metadata.iter().map(|m| m.hash.as_str()).collect();
+        assert_eq!(hashes, vec!["abc123", "def456", "ghi789"]);
     }
 
     #[test]
@@ -211,7 +217,8 @@ mod tests {
     fn test_sri_generate() {
         let content = b"test content";
         let integrity = SubresourceIntegrity::generate(content, HashAlgorithm::Sha256);
-        assert!(integrity.starts_with("sha256-"));
+        // Base64 of the SHA-256 digest of "test content".
+        assert_eq!(integrity, "sha256-auinVVUgn9bEQVfArtgBbnY/9DWhnPGG92hjFAFD/3I=");
     }
 
     #[test]

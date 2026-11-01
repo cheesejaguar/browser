@@ -220,8 +220,10 @@ impl HttpClient {
         // Store cookies from response
         if self.config.store_cookies {
             let mut cookies = self.cookies.write();
-            for cookie in response.cookies() {
-                cookies.add_from_response(&request.url, &cookie.to_string());
+            for set_cookie in response.headers().get_all(reqwest::header::SET_COOKIE) {
+                if let Ok(set_cookie) = set_cookie.to_str() {
+                    cookies.add_from_response(&request.url, set_cookie);
+                }
             }
         }
 
@@ -232,13 +234,13 @@ impl HttpClient {
     /// Fetch a URL and return the body bytes.
     pub async fn fetch(&self, url: &str) -> Result<Bytes, ClientError> {
         let response = self.get(url).send().await?;
-        response.bytes().await
+        response.bytes()
     }
 
     /// Fetch a URL and return the body as text.
     pub async fn fetch_text(&self, url: &str) -> Result<String, ClientError> {
         let response = self.get(url).send().await?;
-        response.text().await
+        response.text()
     }
 
     /// Get the cookie jar.
@@ -344,5 +346,77 @@ mod tests {
         assert_eq!(builder.config.timeout, Duration::from_secs(60));
         assert_eq!(builder.config.max_redirects, 10);
         assert!(!builder.config.http2);
+    }
+
+    /// Serve a single canned HTTP/1.1 response on a local port and return the
+    /// URL plus a handle resolving to the raw request the server received.
+    async fn serve_once(
+        response: &'static [u8],
+    ) -> (String, tokio::task::JoinHandle<String>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 1024];
+            while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = socket.read(&mut chunk).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n]);
+            }
+            socket.write_all(response).await.unwrap();
+            socket.shutdown().await.unwrap();
+            String::from_utf8_lossy(&buf).into_owned()
+        });
+        (format!("http://{}/page", addr), handle)
+    }
+
+    #[tokio::test]
+    async fn test_fetch_text_decodes_charset_and_stores_cookies() {
+        // Body is "café" encoded as ISO-8859-1 (0xE9 for 'é').
+        let (url, server) = serve_once(
+            b"HTTP/1.1 200 OK\r\n\
+Content-Type: text/plain; charset=iso-8859-1\r\n\
+Set-Cookie: session=abc123; Path=/\r\n\
+Content-Length: 4\r\n\
+Connection: close\r\n\
+\r\n\
+caf\xE9",
+        )
+        .await;
+
+        let client = HttpClientBuilder::new().http2(false).build().unwrap();
+        let text = client.fetch_text(&url).await.unwrap();
+        assert_eq!(text, "caf\u{e9}");
+
+        let raw_request = server.await.unwrap();
+        assert!(raw_request.starts_with("GET /page HTTP/1.1\r\n"));
+
+        let parsed = Url::parse(&url).unwrap();
+        assert_eq!(client.cookies().read().get_cookie_header(&parsed), "session=abc123");
+    }
+
+    #[tokio::test]
+    async fn test_stored_cookies_are_sent_on_next_request() {
+        let client = HttpClientBuilder::new().http2(false).build().unwrap();
+
+        let (url, server) = serve_once(
+            b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+        client
+            .cookies()
+            .write()
+            .add_from_response(&Url::parse(&url).unwrap(), "token=xyz; Path=/");
+
+        let response = client.get(&url).send().await.unwrap();
+        assert_eq!(response.status, http::StatusCode::NO_CONTENT);
+
+        let raw_request = server.await.unwrap().to_ascii_lowercase();
+        assert!(raw_request.contains("\r\ncookie: token=xyz\r\n"));
     }
 }

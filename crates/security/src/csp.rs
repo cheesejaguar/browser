@@ -531,9 +531,24 @@ mod tests {
             "default-src 'self'; script-src 'self' https://cdn.example.com; style-src 'unsafe-inline'",
         );
 
-        assert!(csp.directives.contains_key("default-src"));
-        assert!(csp.directives.contains_key("script-src"));
-        assert!(csp.directives.contains_key("style-src"));
+        assert_eq!(csp.directives.len(), 3);
+
+        // script-src lists the CDN host but not 'unsafe-inline'.
+        let cdn = Url::parse("https://cdn.example.com/app.js").unwrap();
+        let evil = Url::parse("https://evil.com/app.js").unwrap();
+        assert!(csp.allows_script(&cdn, None, None).is_allowed());
+        assert!(csp.allows_script(&evil, None, None).is_blocked());
+        assert!(csp.allows_inline_script(None, None).is_blocked());
+
+        // style-src only has 'unsafe-inline'.
+        assert!(csp.allows_inline_style(None, None).is_allowed());
+
+        // img-src is not listed, so it falls back to default-src 'self'.
+        let image = Url::parse("https://evil.com/pixel.png").unwrap();
+        assert!(csp.allows_image(&image).is_blocked());
+
+        // form-action has no default-src fallback, so it is unrestricted.
+        assert!(csp.allows_form_action(&evil).is_allowed());
     }
 
     #[test]

@@ -86,7 +86,7 @@ impl Layer {
         if let Some(parent_id) = self.parent {
             if let Some(parent) = tree.get(parent_id) {
                 let parent_transform = parent.accumulated_transform(tree);
-                transform = parent_transform.multiply(&transform);
+                transform = transform.then(&parent_transform);
             }
         }
 
@@ -201,7 +201,7 @@ impl LayerTree {
         // Remove from parent
         if let Some(parent_id) = self.layers.get(layer_id).and_then(|l| l.parent) {
             if let Some(parent) = self.layers.get_mut(parent_id) {
-                parent.children.retain(|&id| id != layer_id);
+                parent.children.retain(|id| *id != layer_id);
             }
         }
 

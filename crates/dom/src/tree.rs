@@ -624,7 +624,9 @@ mod tests {
     #[test]
     fn test_tree_creation() {
         let tree = DomTree::new();
-        assert!(tree.root().is_some());
+        let root = tree.root().unwrap();
+        assert_eq!(tree.get(root).unwrap().node_type, NodeType::Document);
+        assert_eq!(tree.first_child(root), None);
     }
 
     #[test]
@@ -668,5 +670,6 @@ mod tests {
 
         assert!(tree.get(div).is_none());
         assert!(tree.get(span).is_none());
+        assert_eq!(tree.first_child(root), None);
     }
 }

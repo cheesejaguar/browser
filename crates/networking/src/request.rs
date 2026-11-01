@@ -173,8 +173,9 @@ impl<'a> RequestBuilder<'a> {
 
     /// Send the request.
     pub async fn send(self) -> Result<Response, ClientError> {
+        let client = self.client;
         let request = self.build()?;
-        self.client.execute(request).await
+        client.execute(request).await
     }
 }
 
@@ -231,7 +232,15 @@ fn base64_writer(output: &mut Vec<u8>) -> impl std::io::Write + '_ {
 
 /// Request method aliases.
 pub mod method {
-    pub use http::Method::{DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT};
+    use http::Method;
+
+    pub const DELETE: Method = Method::DELETE;
+    pub const GET: Method = Method::GET;
+    pub const HEAD: Method = Method::HEAD;
+    pub const OPTIONS: Method = Method::OPTIONS;
+    pub const PATCH: Method = Method::PATCH;
+    pub const POST: Method = Method::POST;
+    pub const PUT: Method = Method::PUT;
 }
 
 #[cfg(test)]
@@ -245,7 +254,42 @@ mod tests {
             .header("Accept", "text/html");
 
         assert_eq!(request.method, Method::GET);
-        assert!(request.headers.get("Accept").is_some());
+        assert_eq!(request.headers.get("Accept"), Some(&"text/html".to_string()));
+    }
+
+    #[test]
+    fn test_builder_form_body() {
+        let client = crate::client::HttpClient::new().unwrap();
+        let request = client
+            .post("https://example.com/submit")
+            .form(&[("name", "Jane Doe"), ("lang", "en&fr")])
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(
+            request.headers.get("Content-Type"),
+            Some(&"application/x-www-form-urlencoded".to_string())
+        );
+        assert_eq!(
+            request.body.as_deref(),
+            Some(&b"name=Jane+Doe&lang=en%26fr"[..])
+        );
+    }
+
+    #[test]
+    fn test_builder_rejects_invalid_url() {
+        let client = crate::client::HttpClient::new().unwrap();
+        let result = client.get("not a url").build();
+        assert!(matches!(result, Err(ClientError::InvalidUrl(_))));
+    }
+
+    #[test]
+    fn test_method_aliases() {
+        assert_eq!(method::GET, Method::GET);
+        assert_eq!(method::POST, Method::POST);
+        assert_eq!(method::DELETE, Method::DELETE);
     }
 
     #[test]

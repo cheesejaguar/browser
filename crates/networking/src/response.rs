@@ -118,10 +118,12 @@ impl Response {
 
     /// Get the body as text.
     pub fn text(self) -> Result<String, ClientError> {
-        let bytes = self.bytes()?;
-
         // Detect encoding from content-type or BOM
-        let encoding = self.detect_encoding(&bytes);
+        let encoding = match &self.body {
+            Some(body) => self.detect_encoding(body),
+            None => encoding_rs::UTF_8,
+        };
+        let bytes = self.bytes()?;
 
         let (text, _, _) = encoding.decode(&bytes);
         Ok(text.into_owned())

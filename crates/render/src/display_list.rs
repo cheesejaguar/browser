@@ -84,7 +84,7 @@ impl DisplayList {
     }
 
     /// Get items within a clip rect.
-    pub fn items_in_rect(&self, rect: &Rect) -> impl Iterator<Item = &DisplayItem> {
+    pub fn items_in_rect<'a>(&'a self, rect: &'a Rect) -> impl Iterator<Item = &'a DisplayItem> + 'a {
         self.items.iter().filter(move |item| {
             item.bounds.intersects(rect)
         })

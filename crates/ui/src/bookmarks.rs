@@ -29,9 +29,12 @@ impl BookmarkManager {
         let id = self.id_counter;
         let bookmark = Bookmark::new(id, url, title);
 
-        let folder = folder_id
-            .and_then(|id| self.find_folder_mut(id))
-            .unwrap_or(&mut self.bookmark_bar);
+        let folder = match folder_id {
+            Some(fid) if self.find_folder_mut(fid).is_some() => {
+                self.find_folder_mut(fid).expect("folder exists")
+            }
+            _ => &mut self.bookmark_bar,
+        };
 
         folder.items.push(BookmarkItem::Bookmark(bookmark));
         id
@@ -42,9 +45,12 @@ impl BookmarkManager {
         let id = self.id_counter;
         let folder = BookmarkFolder::new(id, name);
 
-        let parent = parent_id
-            .and_then(|id| self.find_folder_mut(id))
-            .unwrap_or(&mut self.bookmark_bar);
+        let parent = match parent_id {
+            Some(fid) if self.find_folder_mut(fid).is_some() => {
+                self.find_folder_mut(fid).expect("folder exists")
+            }
+            _ => &mut self.bookmark_bar,
+        };
 
         parent.items.push(BookmarkItem::Folder(folder));
         id

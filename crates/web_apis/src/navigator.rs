@@ -54,7 +54,7 @@ impl Navigator {
             cookie_enabled: true,
             do_not_track: None,
             max_touch_points: 0,
-            hardware_concurrency: num_cpus::get() as u32,
+            hardware_concurrency: std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1),
             device_memory: 8.0,
         }
     }

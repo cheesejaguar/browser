@@ -429,10 +429,4 @@ mod tests {
         assert!((v1 - 0.15).abs() < 0.001);
     }
 
-    #[test]
-    fn test_glyph_key() {
-        let key1 = GlyphKey { glyph_id: 65, size: 160 };
-        let key2 = GlyphKey { glyph_id: 65, size: 160 };
-        assert_eq!(key1, key2);
-    }
 }

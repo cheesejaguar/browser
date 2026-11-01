@@ -428,10 +428,10 @@ mod tests {
         let mut builder = RenderCommandBuilder::new();
 
         builder
-            .clear(Color::white())
-            .draw_rect(Rect::new(0.0, 0.0, 100.0, 100.0), Color::red())
+            .clear(Color::WHITE)
+            .draw_rect(Rect::new(0.0, 0.0, 100.0, 100.0), Color::RED)
             .push_clip(Rect::new(10.0, 10.0, 80.0, 80.0), None)
-            .draw_rect(Rect::new(20.0, 20.0, 60.0, 60.0), Color::blue())
+            .draw_rect(Rect::new(20.0, 20.0, 60.0, 60.0), Color::BLUE)
             .pop_clip();
 
         let list = builder.build();
@@ -445,7 +445,7 @@ mod tests {
         // Add commands in non-optimal order
         list.push(RenderCommand::DrawRect(DrawRectCommand {
             rect: Rect::new(0.0, 0.0, 10.0, 10.0),
-            color: Color::red(),
+            color: Color::RED,
         }));
         list.push(RenderCommand::DrawImage(DrawImageCommand {
             rect: Rect::new(0.0, 0.0, 10.0, 10.0),
@@ -455,7 +455,7 @@ mod tests {
         }));
         list.push(RenderCommand::DrawRect(DrawRectCommand {
             rect: Rect::new(10.0, 10.0, 10.0, 10.0),
-            color: Color::blue(),
+            color: Color::BLUE,
         }));
 
         list.optimize();

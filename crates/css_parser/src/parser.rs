@@ -437,8 +437,20 @@ fn parse_selector<'i, 't>(
                 }
                 Token::WhiteSpace(_) => {
                     if has_content {
-                        // Descendant combinator
-                        selector.combinator = Some(crate::selector::Combinator::Descendant);
+                        // Whitespace is a descendant combinator unless it
+                        // surrounds an explicit one (e.g. `div > p`).
+                        use crate::selector::Combinator;
+                        let explicit = input.try_parse(
+                            |i| -> Result<Combinator, ParseError<'i, CssParseError<'i>>> {
+                                match i.next()? {
+                                    Token::Delim('>') => Ok(Combinator::Child),
+                                    Token::Delim('+') => Ok(Combinator::NextSibling),
+                                    Token::Delim('~') => Ok(Combinator::SubsequentSibling),
+                                    _ => Err(i.new_custom_error(CssParseError::InvalidSelector)),
+                                }
+                            },
+                        );
+                        selector.combinator = Some(explicit.unwrap_or(Combinator::Descendant));
                         break;
                     }
                 }
@@ -476,8 +488,13 @@ fn parse_selector<'i, 't>(
         // Skip whitespace after combinator
         while input.try_parse(|i| i.expect_whitespace()).is_ok() {}
 
-        if let Ok(next) = parse_selector(input) {
-            selector.next = Some(Box::new(next));
+        match parse_selector(input) {
+            Ok(next) => selector.next = Some(Box::new(next)),
+            // Whitespace before `{` or `,` is not a descendant combinator.
+            Err(_) if selector.combinator == Some(crate::selector::Combinator::Descendant) => {
+                selector.combinator = None;
+            }
+            Err(_) => {}
         }
     }
 
@@ -713,8 +730,18 @@ fn parse_component_value<'i, 't>(
 ) -> Result<CssValue, ParseError<'i, CssParseError<'i>>> {
     let mut values = Vec::new();
 
-    while let Ok(token) = input.next() {
+    loop {
+        let state = input.state();
+        let token = match input.next() {
+            Ok(token) => token,
+            Err(_) => break,
+        };
         let value = match token {
+            Token::Delim('!') => {
+                // Leave `!important` for the declaration parser.
+                input.reset(&state);
+                break;
+            }
             Token::Ident(s) => CssValue::Ident(s.to_string()),
             Token::Number { value, .. } => CssValue::Number(*value),
             Token::Percentage { unit_value, .. } => CssValue::Percentage(*unit_value * 100.0),
@@ -766,19 +793,71 @@ mod tests {
         let css = "div { color: red; }";
         let stylesheet = parse_css(css, Url::parse("about:blank").unwrap());
         assert_eq!(stylesheet.rules.len(), 1);
+
+        let rule = match &stylesheet.rules[0] {
+            CssRule::Style(rule) => rule,
+            other => panic!("expected a style rule, got {:?}", other),
+        };
+        assert_eq!(rule.selectors.to_css_string(), "div");
+        assert_eq!(rule.declarations.len(), 1);
+        assert_eq!(rule.declarations[0].property, PropertyId::Color);
+        assert!(!rule.declarations[0].important);
+    }
+
+    #[test]
+    fn test_parse_selector_chain() {
+        let css = "div > p.note, ul li { color: red; }";
+        let stylesheet = parse_css(css, Url::parse("about:blank").unwrap());
+        let rule = match &stylesheet.rules[0] {
+            CssRule::Style(rule) => rule,
+            other => panic!("expected a style rule, got {:?}", other),
+        };
+        assert_eq!(rule.selectors.to_css_string(), "div > p.note, ul li");
+    }
+
+    #[test]
+    fn test_parse_important_in_rule() {
+        let css = "p { margin: 0 auto !important; color: blue }";
+        let stylesheet = parse_css(css, Url::parse("about:blank").unwrap());
+        let rule = match &stylesheet.rules[0] {
+            CssRule::Style(rule) => rule,
+            other => panic!("expected a style rule, got {:?}", other),
+        };
+        assert_eq!(rule.declarations.len(), 2);
+        assert_eq!(rule.declarations[0].property, PropertyId::Margin);
+        assert!(rule.declarations[0].important);
+        assert!(matches!(&rule.declarations[0].value, CssValue::List(v) if v.len() == 2));
+        assert!(!rule.declarations[1].important);
     }
 
     #[test]
     fn test_parse_style_attribute() {
-        let style = "color: red; font-size: 16px;";
+        let style = "color: red; font-size: 16px !important;";
         let declarations = parse_style_attribute(style);
         assert_eq!(declarations.len(), 2);
+
+        assert_eq!(declarations[0].property, PropertyId::Color);
+        assert!(!declarations[0].important);
+
+        assert_eq!(declarations[1].property, PropertyId::FontSize);
+        assert_eq!(declarations[1].value.as_px(), Some(16.0));
+        assert!(declarations[1].important);
     }
 
     #[test]
     fn test_parse_media_rule() {
         let css = "@media screen and (min-width: 768px) { div { color: blue; } }";
         let stylesheet = parse_css(css, Url::parse("about:blank").unwrap());
-        assert!(!stylesheet.rules.is_empty());
+        assert_eq!(stylesheet.rules.len(), 1);
+
+        let media = match &stylesheet.rules[0] {
+            CssRule::Media(media) => media,
+            other => panic!("expected a media rule, got {:?}", other),
+        };
+        assert_eq!(media.rules.len(), 1);
+        assert!(matches!(media.rules[0], CssRule::Style(_)));
+
+        assert!(media.matches(&crate::media::MediaContext::screen(1024.0, 768.0)));
+        assert!(!media.matches(&crate::media::MediaContext::screen(500.0, 800.0)));
     }
 }

@@ -308,7 +308,11 @@ mod tests {
 
         assert_eq!(run.text, "Hello");
         assert_eq!(run.glyphs.len(), 5);
-        assert!(run.width > 0.0);
+        assert_eq!(run.width, shaper.measure_width("Hello", &style));
+        let advances: f32 = run.glyphs.iter().map(|g| g.advance).sum();
+        assert_eq!(run.width, advances);
+        let clusters: Vec<u32> = run.glyphs.iter().map(|g| g.cluster).collect();
+        assert_eq!(clusters, vec![0, 1, 2, 3, 4]);
     }
 
     #[test]
@@ -317,7 +321,30 @@ mod tests {
         let style = ComputedStyle::default_style();
         let mut run = shaper.shape_text("Hello World", &style);
 
-        shaper.break_into_lines(&mut run, 50.0);
-        // Should have at least one line break if width is small enough
+        // Wide enough for "Hello " and for "World", but not for "Hello W":
+        // the break must happen at the space, before "World" (glyph 6).
+        let hello_w = shaper.measure_width("Hello W", &style);
+        let world = shaper.measure_width("World", &style);
+        assert!(world < hello_w);
+        shaper.break_into_lines(&mut run, (hello_w + world) / 2.0);
+        assert_eq!(run.line_breaks, vec![6]);
+
+        // Everything fits on one line: no breaks.
+        let full_width = run.width;
+        shaper.break_into_lines(&mut run, full_width + 1.0);
+        assert!(run.line_breaks.is_empty());
+    }
+
+    #[test]
+    fn test_line_breaking_forced_without_spaces() {
+        let shaper = TextShaper::new();
+        let style = ComputedStyle::default_style();
+        let mut run = shaper.shape_text("abcdef", &style);
+
+        // Room for two glyphs per line and no break opportunities, so the
+        // word is broken every two glyphs.
+        let two_glyphs = shaper.measure_width("ab", &style);
+        shaper.break_into_lines(&mut run, two_glyphs + 0.5);
+        assert_eq!(run.line_breaks, vec![2, 4]);
     }
 }

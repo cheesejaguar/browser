@@ -161,7 +161,7 @@ impl Compositor {
                 texture.dirty = true;
             }
         } else {
-            let texture_id = layer.id.0.as_ffi() as u64;
+            let texture_id = slotmap::Key::data(&layer.id).as_ffi();
             self.layer_textures.insert(
                 layer.id,
                 LayerTexture {
@@ -189,12 +189,13 @@ impl Compositor {
 
     /// Composite all layers to the screen.
     fn composite_to_screen(&mut self, scene: &Scene, paint_order: &[LayerId]) {
+        let layer_textures = &self.layer_textures;
         let mut frame = self.renderer.begin_frame();
 
         // Render each layer
         for layer_id in paint_order {
             if let Some(layer) = scene.get_layer(*layer_id) {
-                self.render_layer(&mut frame, scene, layer);
+                Self::render_layer(layer_textures, &mut frame, scene, layer);
             }
         }
 
@@ -204,7 +205,7 @@ impl Compositor {
 
     /// Render a layer to the current frame.
     fn render_layer(
-        &self,
+        layer_textures: &HashMap<LayerId, LayerTexture>,
         frame: &mut gpu::renderer::RenderFrame,
         scene: &Scene,
         layer: &Layer,
@@ -220,15 +221,15 @@ impl Compositor {
 
         // If layer has its own texture, composite it
         if layer.requires_compositing() {
-            if let Some(texture) = self.layer_textures.get(&layer.id) {
+            if let Some(texture) = layer_textures.get(&layer.id) {
                 // Draw the layer texture with opacity and transform
-                let color = Color::new(255, 255, 255, (layer.opacity * 255.0) as u8);
+                let color = Color::rgba(255, 255, 255, (layer.opacity * 255.0) as u8);
                 frame.draw_texture(texture.texture_id, layer.bounds.clone(), None, color);
             }
         } else {
             // Render display list directly
             for item in layer.display_list.items() {
-                self.render_display_item(frame, item, layer);
+                Self::render_display_item(frame, item, layer);
             }
         }
 
@@ -239,7 +240,6 @@ impl Compositor {
 
     /// Render a display item.
     fn render_display_item(
-        &self,
         frame: &mut gpu::renderer::RenderFrame,
         item: &DisplayItem,
         layer: &Layer,
@@ -256,7 +256,7 @@ impl Compositor {
                     image.image_key.0,
                     item.bounds.clone(),
                     image.src_rect.clone(),
-                    Color::white(),
+                    Color::WHITE,
                 );
             }
             _ => {

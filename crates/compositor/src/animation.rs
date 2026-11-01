@@ -161,7 +161,7 @@ impl Animation {
             )),
             transform: prev.values.transform.as_ref().map(|prev_t| {
                 let next_t = next.values.transform.as_ref().unwrap_or(prev_t);
-                prev_t.interpolate(next_t, local_progress)
+                interpolate_transform(prev_t, next_t, local_progress)
             }),
         }
     }
@@ -327,6 +327,18 @@ impl Default for AnimationController {
 /// Linear interpolation.
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
+}
+
+/// Linearly interpolate each component of two affine transforms.
+fn interpolate_transform(from: &Transform, to: &Transform, t: f32) -> Transform {
+    Transform {
+        m11: lerp(from.m11, to.m11, t),
+        m12: lerp(from.m12, to.m12, t),
+        m21: lerp(from.m21, to.m21, t),
+        m22: lerp(from.m22, to.m22, t),
+        m31: lerp(from.m31, to.m31, t),
+        m32: lerp(from.m32, to.m32, t),
+    }
 }
 
 /// Cubic bezier easing.

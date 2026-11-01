@@ -375,6 +375,8 @@ mod tests {
 
         let origin = Origin::parse("https://example.com").unwrap();
         assert!(policy.is_feature_allowed_for_self("geolocation"));
+        assert!(policy.is_feature_allowed("geolocation", &origin, true));
+        assert!(!policy.is_feature_allowed("geolocation", &origin, false));
         assert!(policy.is_feature_allowed("camera", &origin, false));
     }
 
